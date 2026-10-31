@@ -1,13 +1,18 @@
 {
-  "nama_usaha": "Digital Store UMKM",
-  "slogan": "Pusat Langganan AI, Streaming, dan Software Premium Terpercaya",
-  "deskripsi": "Menyediakan berbagai akun premium, langganan tools AI, streaming, aplikasi desain, dan VPN dengan harga hemat, proses cepat, dan garansi penuh. Jikalau ada masalah hubungi akun Telegram username @Carlendra.",
+  "nama_usaha": "Elva Tech",
+  "slogan": "Pusat Langganan AI, Streaming, Software Premium, dan Jasa Kreatif Terpercaya",
+  "deskripsi": "Menyediakan berbagai akun premium, langganan tools AI, streaming, aplikasi desain, VPN, dan layanan jasa kreatif dengan harga hemat, proses cepat, dan garansi penuh. Jikalau ada masalah hubungi akun Telegram username @Carlendra.",
   "kontak_admin": "Jikalau ada masalah hubungi akun Telegram username @Carlendra",
+  "elva_group": {
+    "nama": "Elva Group",
+    "url": "https://t.me/+elvagroup",
+    "deskripsi": "Grup resmi Elva Tech untuk update restock, notifikasi saat stok reset, promo kilat, dan diskusi komunitas pelanggan."
+  },
   "syarat_ketentuan": "⚠️ Harap mematuhi syarat dan ketentuan yang berlaku. Garansi berlaku sesuai durasi langganan. Dilarang mengubah data akun kecuali jenis Private.",
   "info_pembayaran": {
     "qris": "QRIS Dinamis / Statis (Mendukung semua E-Wallet & Mobile Banking)",
-    "bank": "Bank BCA: 1234567890 a/n Toko Digital",
-    "ewallet": "DANA / OVO / GoPay: 081234567890 a/n Toko Digital",
+    "bank": "Bank BCA: 1234567890 a/n Elva Tech",
+    "ewallet": "DANA / OVO / GoPay: 081234567890 a/n Elva Tech",
     "catatan": "Kirimkan bukti transfer ke chat ini setelah melakukan pembayaran agar pesanan langsung diproses otomatis oleh admin."
   },
   "kategori": [

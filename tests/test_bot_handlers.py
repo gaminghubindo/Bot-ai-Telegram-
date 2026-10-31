@@ -218,6 +218,55 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("LANDING PAGE", detail_text)
         self.assertIn("Rp45.000", detail_text)
 
+    async def test_grup_command_and_callback(self):
+        """Uji /grup dan callback view_group untuk Elva Group."""
+        chat_id = 112233
+        user = MagicMock(username="lnel_user", full_name="Lnel")
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        update.effective_user = user
+        update.message.set_reaction = AsyncMock()
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        # Command /grup
+        await main.grup_command(update, context)
+        context.bot.send_message.assert_called_once()
+        grup_text = context.bot.send_message.call_args.kwargs["text"]
+        self.assertIn("ELVA GROUP", grup_text)
+        self.assertIn("RESTOCK", grup_text)
+
+        # Callback view_group
+        update_grp = MagicMock()
+        update_grp.effective_chat.id = chat_id
+        update_grp.effective_user = user
+        update_grp.callback_query.data = "view_group"
+        update_grp.callback_query.answer = AsyncMock()
+        update_grp.callback_query.edit_message_text = AsyncMock()
+
+        await main.handle_callback_query(update_grp, context)
+        update_grp.callback_query.edit_message_text.assert_called_once()
+        edit_text = update_grp.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("ELVA GROUP", edit_text)
+
+    async def test_restock_command_owner(self):
+        """Uji perintah /restock oleh pemilik toko."""
+        chat_id = "5803366133"
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        context = MagicMock()
+        context.args = ["Gemini", "Pro", "sudah", "restock", "20", "akun!"]
+        context.bot.send_message = AsyncMock()
+
+        with patch.object(main, "OWNER_CHAT_ID", "5803366133"):
+            await main.restock_command(update, context)
+
+        context.bot.send_message.assert_called_once()
+        sent_msg = context.bot.send_message.call_args.kwargs["text"]
+        self.assertIn("NOTIFIKASI RESTOCK", sent_msg)
+        self.assertIn("Gemini Pro sudah restock 20 akun!", sent_msg)
+
 
 if __name__ == "__main__":
     unittest.main()

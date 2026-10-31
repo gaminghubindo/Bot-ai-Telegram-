@@ -149,6 +149,73 @@ async def jasa_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
 
 
+async def grup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /grup atau /group: Menampilkan informasi & tautan bergabung ke Elva Group."""
+    if update.message:
+        await safe_react(update.message, "📢")
+
+    chat_id = update.effective_chat.id
+    text, reply_markup = orders.build_group_keyboard()
+    await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+
+
+async def restock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /restock (Khusus Owner): Mengirim notifikasi reset/restock stok ke Elva Group."""
+    chat_id = str(update.effective_chat.id)
+
+    # Validasi hanya pemilik toko yang bisa broadcast
+    if OWNER_CHAT_ID and chat_id != str(OWNER_CHAT_ID):
+        await send_safe_message(context, chat_id, "⚠️ Perintah ini khusus untuk pemilik toko.")
+        return
+
+    # Ambil pesan restock dari argumen perintah
+    args = context.args
+    if not args:
+        help_msg = (
+            "📢 *PANDUAN BROADCAST RESTOCK (OWNER)*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Gunakan format: `/restock <informasi restock>`\n\n"
+            "*Contoh:*\n"
+            "`/restock Gemini Pro 3 Bulan & ChatGPT Plus sudah restock 50 akun! Langsung order di bot sebelum kehabisan!`\n\n"
+            "💡 _Notifikasi ini otomatis dikirimkan ke Elva Group jika ID grup sudah disetel di .env._"
+        )
+        await send_safe_message(context, chat_id, help_msg)
+        return
+
+    restock_text = " ".join(args)
+    elva_group_chat_id = os.getenv("ELVA_GROUP_CHAT_ID", "").strip()
+
+    announcement = (
+        "🔔 *NOTIFIKASI RESTOCK & RESET STOK ELVA TECH!* 🔔\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{restock_text}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "⚡ *Cara Beli:* Langsung buka bot @Profesional_umkm_bot dan klik menu produk!\n"
+        "💬 Ada pertanyaan? Hubungi akun Telegram @Carlendra"
+    )
+
+    if elva_group_chat_id:
+        try:
+            await context.bot.send_message(
+                chat_id=elva_group_chat_id,
+                text=announcement,
+                parse_mode=constants.ParseMode.MARKDOWN
+            )
+            await send_safe_message(context, chat_id, "✅ Pesan restock berhasil otomatis dikirim ke Elva Group! 🚀")
+            return
+        except Exception as e:
+            logger.error(f"Gagal mengirim pesan restock ke Elva Group ({e})")
+
+    # Jika ELVA_GROUP_CHAT_ID belum disetel di .env
+    reply = (
+        "📢 *Pesan Restock Siap Dikirim:*\n\n"
+        f"{announcement}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 *Tips Otomatisasi:* Masukkan ID Elva Group ke file `.env` pada variabel `ELVA_GROUP_CHAT_ID` agar bot dapat mengirim langsung ke grup tanpa perlu disalin manual."
+    )
+    await send_safe_message(context, chat_id, reply)
+
+
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /id: Menampilkan Chat ID Telegram pengguna."""
     if update.message:
@@ -213,6 +280,13 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await edit_safe_message(query, text, markup)
         return
 
+    # 2d. Lihat Elva Group (Info Restock & Reset Stok)
+    if data == "view_group":
+        await query.answer("📢 Membuka Informasi Elva Group... ✨")
+        text, markup = orders.build_group_keyboard()
+        await edit_safe_message(query, text, markup)
+        return
+
     # 2c. Lihat Detail Jasa Tertentu
     if data.startswith("jasa_detail:"):
         await query.answer("🔍 Membuka detail & tarif layanan... ✨")
@@ -231,7 +305,11 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 4. Klik Varian yang Stoknya Habis
     if data.startswith("var_empty:"):
-        await query.answer("🥺 Yah, stok varian ini sedang habis kak! Silakan pilih varian lain yaa 🙏", show_alert=True)
+        await query.answer(
+            "🥺 Yah, stok varian ini sedang habis kak!\n\n"
+            "Yuk gabung ke Elva Group agar langsung dapat notifikasi saat stok di-reset & ready ya! ✨",
+            show_alert=True
+        )
         return
 
     # 5. Pilih Varian yang Tersedia -> Tampilkan Numpad / Stepper Jumlah
@@ -542,6 +620,7 @@ async def post_init(application: Application) -> None:
     commands = [
         BotCommand("menu", "💎 Buka Menu & Katalog Produk"),
         BotCommand("jasa", "🛠️ Layanan Jasa (Landing Page, Desain, 3D)"),
+        BotCommand("grup", "📢 Gabung Elva Group (Info Restock)"),
         BotCommand("start", "🚀 Mulai / Dashboard Akun"),
         BotCommand("id", "🆔 Cek Chat ID Akun Saya"),
     ]
@@ -551,17 +630,19 @@ async def post_init(application: Application) -> None:
         
         # Atur deskripsi bot di Telegram (Muncul saat chat pertama kali dibuka)
         desc = (
-            "Selamat datang di Toko Digital & Layanan Jasa Kreatif UMKM!\n\n"
+            "Selamat datang di Elva Tech — Toko Digital & Layanan Jasa Kreatif UMKM!\n\n"
             "💎 Produk Digital:\n"
             "Akun AI & Desain Premium (Gemini Pro, ChatGPT, Canva Pro, Netflix, dll).\n\n"
             "🛠️ Layanan Jasa Profesional:\n"
             "• Pembuatan Landing Page UMKM (Rp45.000)\n"
             "• Desain Presentasi PPT & Canva (Rp2.000 / slide)\n"
             "• 3D Modeling & Rendering Produk (Rp90.000)\n\n"
+            "📢 Elva Group (Info Restock & Reset Stok):\n"
+            "Gabung grup agar selalu dapat notif saat stok akun ready!\n\n"
             "🌐 Website Resmi Lynk.id: https://lynk.id/nellionel\n"
             "💬 Tanya-tanya & Konsultasi Jasa: Hubungi Telegram @Carlendra"
         )
-        short_desc = "Pusat Jasa Kreatif & Akun Digital. Web: lynk.id/nellionel. CS: @Carlendra"
+        short_desc = "Elva Tech: Jasa Kreatif, Akun Digital & Info Restock Elva Group. CS: @Carlendra"
         try:
             await application.bot.set_my_description(desc)
             await application.bot.set_my_short_description(short_desc)
@@ -580,7 +661,7 @@ def main() -> None:
         return
 
     print("=" * 60)
-    print("🤖 Memulai Bot Telegram Toko Digital UMKM...")
+    print("🤖 Memulai Bot Telegram Elva Tech...")
     print(f"Owner Chat ID: {OWNER_CHAT_ID or 'Belum disetel (gunakan /id di bot)'}")
     print("Tekan Ctrl+C untuk menghentikan bot.")
     print("=" * 60)
@@ -591,6 +672,9 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("jasa", jasa_command))
+    application.add_handler(CommandHandler("grup", grup_command))
+    application.add_handler(CommandHandler("group", grup_command))
+    application.add_handler(CommandHandler("restock", restock_command))
     application.add_handler(CommandHandler("id", id_command))
 
     # Callback query handler (Tombol Interaktif)

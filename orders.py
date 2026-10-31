@@ -78,6 +78,48 @@ def get_variant_by_id(product: dict, var_id: str) -> Optional[dict]:
     return None
 
 
+def get_group_info() -> dict:
+    """Mendapatkan link dan info grup Elva Group."""
+    menu_data = load_menu()
+    grp = menu_data.get("elva_group", {})
+    env_link = os.getenv("ELVA_GROUP_LINK", "").strip()
+    link = env_link if env_link else grp.get("url", "https://t.me/+elvagroup")
+    return {
+        "nama": grp.get("nama", "Elva Group"),
+        "url": link,
+        "deskripsi": grp.get("deskripsi", "Grup resmi Elva Tech untuk update restock, notifikasi saat stok reset, promo kilat, dan diskusi komunitas pelanggan.")
+    }
+
+
+def build_group_keyboard() -> Tuple[str, InlineKeyboardMarkup]:
+    """Membuat tampilan informasi & tautan bergabung ke Elva Group."""
+    grp = get_group_info()
+    text = (
+        f"📢 *{grp['nama'].upper()} — PUSAT INFORMASI & RESTOCK*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Selamat datang di grup resmi *Elva Tech*! 🚀\n\n"
+        f"Grup ini dibuat khusus untuk pelanggan agar selalu tahu:\n"
+        f"🔔 *Notifikasi Reset Stok*: Info tercepat saat akun/layanan ready kembali!\n"
+        f"⚡ *Flash Sale & Diskon Khusus*: Promo eksklusif khusus member grup.\n"
+        f"🛠️ *Update Layanan & Fitur*: Pembaruan katalog & produk digital baru.\n"
+        f"💬 *Diskusi Komunitas*: Berbagi tips dan konsultasi seputar tools AI & digital.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 *Klik tombol di bawah untuk bergabung ke Elva Group sekarang:* 👇"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🚀 Gabung ke Elva Group Sekarang", url=grp["url"])
+        ],
+        [
+            InlineKeyboardButton("🪙 Katalog Produk", callback_data="view_catalog"),
+            InlineKeyboardButton("◀️ Kembali ke Menu Utama", callback_data="menu_main")
+        ]
+    ]
+
+    return text, InlineKeyboardMarkup(keyboard)
+
+
 # ==========================================
 # PEMBUATAN INLINE KEYBOARD (UI SEPERTI BerryGrowID)
 # ==========================================
@@ -87,7 +129,7 @@ def build_main_dashboard(chat_id: int | str, user_info: dict) -> Tuple[str, Inli
     Membuat tampilan Dashboard Akun & Ringkasan mirip dengan referensi BerryGrowID.
     """
     menu_data = load_menu()
-    nama_usaha = menu_data.get("nama_usaha", "Digital Store")
+    nama_usaha = menu_data.get("nama_usaha", "Elva Tech")
     username_str = f"@{user_info.get('username')}" if user_info.get("username") else "-"
     full_name = user_info.get("full_name", "Pengguna")
 
@@ -116,14 +158,15 @@ def build_main_dashboard(chat_id: int | str, user_info: dict) -> Tuple[str, Inli
             InlineKeyboardButton("🛠️ Layanan Jasa", callback_data="view_jasa")
         ],
         [
-            InlineKeyboardButton("📦 Pesanan Saya", callback_data="my_orders"),
-            InlineKeyboardButton("💳 Info Pembayaran", callback_data="payment_info")
+            InlineKeyboardButton("📢 Elva Group (Info Stok)", callback_data="view_group"),
+            InlineKeyboardButton("📦 Pesanan Saya", callback_data="my_orders")
         ],
         [
-            InlineKeyboardButton("👤 Profil Akun", callback_data="my_profile"),
-            InlineKeyboardButton("❗ Bantuan & Garansi", callback_data="help_info")
+            InlineKeyboardButton("💳 Info Pembayaran", callback_data="payment_info"),
+            InlineKeyboardButton("👤 Profil Akun", callback_data="my_profile")
         ],
         [
+            InlineKeyboardButton("❗ Bantuan & Garansi", callback_data="help_info"),
             InlineKeyboardButton("👨‍💼 Hubungi CS / Admin", callback_data="contact_admin")
         ]
     ]
@@ -310,11 +353,20 @@ def build_product_variants_keyboard(prod_id: str) -> Tuple[str, InlineKeyboardMa
 
         keyboard.append([InlineKeyboardButton(label, callback_data=callback)])
 
+    # Cek apakah ada varian yang stoknya habis
+    has_empty = any(v.get("stok", 0) <= 0 for v in product.get("varian", []))
+
     # Tombol refresh & kembali
     keyboard.append([
         InlineKeyboardButton("🔄 Refresh", callback_data=f"prod:{prod_id}"),
         InlineKeyboardButton("◀️ Kembali", callback_data="view_catalog")
     ])
+
+    if has_empty:
+        grp = get_group_info()
+        keyboard.append([
+            InlineKeyboardButton("📢 Gabung Elva Group (Info Restock)", url=grp["url"])
+        ])
 
     return text, InlineKeyboardMarkup(keyboard)
 
