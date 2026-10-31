@@ -86,12 +86,25 @@ async def edit_safe_message(query, text: str, reply_markup=None) -> None:
             pass
 
 
+async def safe_react(message, emoji: str) -> None:
+    """Menambahkan reaksi emoji lucu pada pesan pengguna secara non-blocking dan aman."""
+    if not message:
+        return
+    try:
+        await message.set_reaction(emoji)
+    except Exception:
+        pass
+
+
 # ==========================================
 # COMMAND HANDLERS (/start, /menu, /id)
 # ==========================================
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /start: Menampilkan Dashboard Akun & Menu Tombol Interaktif."""
+    if update.message:
+        await safe_react(update.message, "🔥")
+
     user = update.effective_user
     chat_id = update.effective_chat.id
 
@@ -110,6 +123,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /menu: Menampilkan Dashboard Akun & Menu Tombol Interaktif."""
+    if update.message:
+        await safe_react(update.message, "⚡")
+
     user = update.effective_user
     chat_id = update.effective_chat.id
 
@@ -125,6 +141,9 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def jasa_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /jasa: Menampilkan menu layanan jasa profesional dari Lynk.id."""
+    if update.message:
+        await safe_react(update.message, "👨‍💻")
+
     chat_id = update.effective_chat.id
     text, reply_markup = orders.build_jasa_keyboard()
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
@@ -132,6 +151,9 @@ async def jasa_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /id: Menampilkan Chat ID Telegram pengguna."""
+    if update.message:
+        await safe_react(update.message, "👍")
+
     user = update.effective_user
     chat_id = update.effective_chat.id
 
@@ -158,11 +180,9 @@ async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 # ==========================================
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Menangani setiap klik tombol inline (Menu, Produk, Varian, Jumlah, Pembayaran)."""
+    """Menangani setiap klik tombol inline (Menu, Produk, Varian, Stepper, Jumlah, Pembayaran)."""
     query = update.callback_query
-    await query.answer()
-
-    data = query.data
+    data = query.data or ""
     user = update.effective_user
     chat_id = update.effective_chat.id
 
@@ -174,24 +194,28 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 1. Kembali ke Menu Dashboard Utama
     if data == "menu_main":
+        await query.answer("🏠 Kembali ke Menu Utama ✨")
         text, markup = orders.build_main_dashboard(chat_id, user_info)
         await edit_safe_message(query, text, markup)
         return
 
     # 2. Lihat Katalog Produk Lengkap (Grid)
     if data == "view_catalog":
+        await query.answer("🛍️ Membuka Katalog Produk Digital... ✨")
         text, markup = orders.build_catalog_keyboard()
         await edit_safe_message(query, text, markup)
         return
 
     # 2b. Lihat Layanan Jasa (Landing Page, Desain, 3D)
     if data == "view_jasa":
+        await query.answer("🎨 Membuka Portofolio Jasa @nellionel... 💼")
         text, markup = orders.build_jasa_keyboard()
         await edit_safe_message(query, text, markup)
         return
 
     # 2c. Lihat Detail Jasa Tertentu
     if data.startswith("jasa_detail:"):
+        await query.answer("🔍 Membuka detail & tarif layanan... ✨")
         jasa_id = data.split(":", 1)[1]
         text, markup = orders.build_jasa_detail_keyboard(jasa_id)
         await edit_safe_message(query, text, markup)
@@ -199,6 +223,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 3. Pilih Produk Tertentu -> Tampilkan Varian & Harga
     if data.startswith("prod:"):
+        await query.answer("📦 Memuat pilihan varian & harga... 🚀")
         prod_id = data.split(":", 1)[1]
         text, markup = orders.build_product_variants_keyboard(prod_id)
         await edit_safe_message(query, text, markup)
@@ -206,15 +231,47 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 4. Klik Varian yang Stoknya Habis
     if data.startswith("var_empty:"):
-        await query.answer("⚠️ Maaf, stok untuk varian ini sedang habis. Silakan pilih varian lain ya!", show_alert=True)
+        await query.answer("🥺 Yah, stok varian ini sedang habis kak! Silakan pilih varian lain yaa 🙏", show_alert=True)
         return
 
-    # 5. Pilih Varian yang Tersedia -> Tampilkan Numpad Jumlah (1-10)
+    # 5. Pilih Varian yang Tersedia -> Tampilkan Numpad / Stepper Jumlah
     if data.startswith("var:"):
+        await query.answer("🔢 Silakan pilih jumlah item ya kak! ✨")
         parts = data.split(":")
         prod_id, var_id = parts[1], parts[2]
         text, markup = orders.build_quantity_keyboard(prod_id, var_id)
         await edit_safe_message(query, text, markup)
+        return
+
+    # 5b. Tombol Stepper Interaktif (+ / -) di Layar Checkout
+    if data.startswith("step:"):
+        parts = data.split(":")
+        prod_id, var_id, new_qty_str = parts[1], parts[2], parts[3]
+        new_qty = int(new_qty_str)
+
+        product = orders.get_product_by_id(prod_id)
+        variant = orders.get_variant_by_id(product, var_id) if product else None
+        stok = variant.get("stok", 10) if variant else 10
+        harga_satuan = variant.get("harga", 0) if variant else 0
+
+        total_harga = harga_satuan * new_qty
+        total_str = orders.format_rupiah(total_harga)
+
+        await query.answer(f"🛒 Jumlah: {new_qty} item ({total_str}) ✨")
+        text, markup = orders.build_checkout_keyboard(prod_id, var_id, new_qty)
+        await edit_safe_message(query, text, markup)
+        return
+
+    # 5c. Info Stepper (Klik Tombol Tengah)
+    if data.startswith("step_info:"):
+        parts = data.split(":")
+        prod_id, var_id, qty_str = parts[1], parts[2], parts[3]
+        qty = int(qty_str)
+        product = orders.get_product_by_id(prod_id)
+        variant = orders.get_variant_by_id(product, var_id) if product else None
+        harga_satuan = variant.get("harga", 0) if variant else 0
+        total_str = orders.format_rupiah(harga_satuan * qty)
+        await query.answer(f"💡 Info: {qty} item · Total {total_str} ✨", show_alert=False)
         return
 
     # 6. Pilih Jumlah Porsi / Akun -> Tampilkan Rincian Checkout & Metode Bayar
@@ -222,6 +279,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         parts = data.split(":")
         prod_id, var_id, qty_str = parts[1], parts[2], parts[3]
         qty = int(qty_str)
+        await query.answer(f"🛒 Dipilih {qty} item. Menyiapkan checkout... 💳")
         text, markup = orders.build_checkout_keyboard(prod_id, var_id, qty)
         await edit_safe_message(query, text, markup)
         return
@@ -231,6 +289,12 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         parts = data.split(":")
         prod_id, var_id, qty_str, method_code = parts[1], parts[2], parts[3], parts[4]
         qty = int(qty_str)
+
+        await query.answer(
+            "🎉 Yeay! Pesanan berhasil dibuat.\n\n"
+            "Silakan transfer dan kirimkan bukti foto pembayaran ke chat ini ya kak! ✨",
+            show_alert=True
+        )
 
         text, markup, owner_msg = orders.build_payment_instruction(
             prod_id, var_id, qty, method_code, chat_id, user_info
@@ -245,8 +309,18 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 logger.error(f"Gagal mengirim pesanan ke owner: {e}")
         return
 
+    # 7b. Hint Petunjuk Pengiriman Bukti Bayar
+    if data == "send_proof_hint":
+        await query.answer(
+            "📸 Kirim foto screenshot bukti transfer langsung ke chat ini ya kak!\n\n"
+            "Admin kami akan segera mengecek dan memberikan akses akun/layanan Anda. 🙏",
+            show_alert=True
+        )
+        return
+
     # 8. Menu Pesanan Saya
     if data == "my_orders":
+        await query.answer("📦 Memuat riwayat belanja kamu... ✨")
         total_spend, order_count = orders.get_user_stats(chat_id)
         text = (
             "📦 *RIWAYAT PESANAN SAYA*\n"
@@ -262,6 +336,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 9. Menu Info Pembayaran
     if data == "payment_info":
+        await query.answer("💳 Memuat rekening & QRIS toko... ✨")
         menu_data = orders.load_menu()
         pay = menu_data.get("info_pembayaran", {})
         text = (
@@ -278,6 +353,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 10. Menu Profil Akun
     if data == "my_profile":
+        await query.answer("👤 Memuat profil akun kamu... ✨")
         total_spend, order_count = orders.get_user_stats(chat_id)
         text = (
             "👤 *PROFIL PENGGUNA*\n"
@@ -285,7 +361,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             f"Nama: *{user_info['full_name']}*\n"
             f"Username: @{user_info['username'] or '-'}\n"
             f"Chat ID: `{chat_id}`\n"
-            f"Status: Pelanggan Aktif\n"
+            f"Status: Pelanggan Aktif ⭐\n"
             f"Total Belanja: {orders.format_rupiah(total_spend)}\n"
         )
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Kembali", callback_data="menu_main")]])
@@ -294,6 +370,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 11. Menu Bantuan & Garansi
     if data == "help_info":
+        await query.answer("💡 Memuat info garansi & bantuan... ✨")
         menu_data = orders.load_menu()
         syarat = menu_data.get("syarat_ketentuan", "-")
         text = (
@@ -314,6 +391,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     # 12. Hubungi Admin / CS
     if data == "contact_admin":
+        await query.answer("👨‍💼 Membuka kontak CS & Telegram @Carlendra... ✨")
         text = (
             "👨‍💼 *LAYANAN CUSTOMER SERVICE*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -326,6 +404,9 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         ])
         await edit_safe_message(query, text, markup)
         return
+
+    # Default fallback answer
+    await query.answer()
 
 
 # ==========================================
@@ -341,6 +422,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user = update.effective_user
     user_text = update.message.text.strip()
 
+    # Reaksi emoji lucu pada pesan chat
+    await safe_react(update.message, "👀")
     await context.bot.send_chat_action(chat_id=chat_id, action=constants.ChatAction.TYPING)
 
     user_info = {
@@ -375,7 +458,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not reply_text:
         fallback_msg = (
             "Duh, lagi ada sedikit gangguan jaringan nih kak. "
-            "Coba kirim lagi sebentar ya, atau langsung tunggu dibalas admin toko. 🙏"
+            "Coba kirim lagi sebentar ya, atau langsung hubungi admin @Carlendra. 🙏"
         )
         await send_safe_message(context, chat_id, fallback_msg)
         return
@@ -415,6 +498,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     chat_id = update.effective_chat.id
     user = update.effective_user
 
+    # Reaksi selebrasi lucu saat bukti transfer masuk
+    if update.message:
+        await safe_react(update.message, "🎉")
+
     user_info = {
         "chat_id": chat_id,
         "username": f"@{user.username}" if user and user.username else "-",
@@ -431,7 +518,6 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 f"🆔 Chat ID: `{chat_id}`\n\n"
                 "⚠️ _Mohon segera cek mutasi rekening/QRIS dan kirimkan akun ke pelanggan ini._"
             )
-            # Ambil foto kualitas tertinggi
             photo_file_id = update.message.photo[-1].file_id
             await context.bot.send_photo(
                 chat_id=OWNER_CHAT_ID,
@@ -446,13 +532,13 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     reply_text = (
         "Terima kasih banyak kak! Foto bukti pembayaran sudah kami terima dan "
         "langsung diteruskan ke admin toko. 🙏\n\n"
-        "Pesanan kakak sedang dicek dan data akun/akses akan segera dikirimkan ya! 😊"
+        "Pesanan kakak sedang diverifikasi dan data akun/akses layanan akan segera dikirimkan ya! 😊"
     )
     await send_safe_message(context, chat_id, reply_text)
 
 
 async def post_init(application: Application) -> None:
-    """Mendaftarkan tombol menu native [ ☰ Menu ] di samping kiri kolom chat Telegram."""
+    """Mendaftarkan tombol menu native [ ☰ Menu ] di samping kiri kolom chat Telegram dan deskripsi bot."""
     commands = [
         BotCommand("menu", "💎 Buka Menu & Katalog Produk"),
         BotCommand("jasa", "🛠️ Layanan Jasa (Landing Page, Desain, 3D)"),
@@ -463,13 +549,24 @@ async def post_init(application: Application) -> None:
         await application.bot.set_my_commands(commands)
         await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         
-        # Atur deskripsi bot di Telegram
-        desc = "Pusat akun premium & layanan jasa profesional (Landing Page, Desain, 3D). Website resmi: https://lynk.id/nellionel. Jikalau ada masalah atau ingin tanya lebih lanjut hubungi akun Telegram @Carlendra."
+        # Atur deskripsi bot di Telegram (Muncul saat chat pertama kali dibuka)
+        desc = (
+            "Selamat datang di Toko Digital & Layanan Jasa Kreatif UMKM!\n\n"
+            "💎 Produk Digital:\n"
+            "Akun AI & Desain Premium (Gemini Pro, ChatGPT, Canva Pro, Netflix, dll).\n\n"
+            "🛠️ Layanan Jasa Profesional:\n"
+            "• Pembuatan Landing Page UMKM (Rp45.000)\n"
+            "• Desain Presentasi PPT & Canva (Rp2.000 / slide)\n"
+            "• 3D Modeling & Rendering Produk (Rp90.000)\n\n"
+            "🌐 Website Resmi Lynk.id: https://lynk.id/nellionel\n"
+            "💬 Tanya-tanya & Konsultasi Jasa: Hubungi Telegram @Carlendra"
+        )
+        short_desc = "Pusat Jasa Kreatif & Akun Digital. Web: lynk.id/nellionel. CS: @Carlendra"
         try:
             await application.bot.set_my_description(desc)
-            await application.bot.set_my_short_description("Layanan Jasa & Akun Digital. Konsultasi Telegram: @Carlendra")
-        except Exception:
-            pass
+            await application.bot.set_my_short_description(short_desc)
+        except Exception as e:
+            logger.warning(f"Gagal mengatur deskripsi bot Telegram: {e}")
 
         logger.info("Tombol menu dan deskripsi bot Telegram berhasil dipasang!")
     except Exception as e:

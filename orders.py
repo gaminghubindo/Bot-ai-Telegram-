@@ -321,7 +321,7 @@ def build_product_variants_keyboard(prod_id: str) -> Tuple[str, InlineKeyboardMa
 
 def build_quantity_keyboard(prod_id: str, var_id: str) -> Tuple[str, InlineKeyboardMarkup]:
     """
-    Membuat tampilan numpad pilihan jumlah beli 1-10 (Screen 4 referensi).
+    Membuat tampilan numpad pilihan jumlah beli 1-10 dengan tombol beli cepat 1 item (Screen 4 referensi).
     """
     product = get_product_by_id(prod_id)
     if not product:
@@ -336,28 +336,29 @@ def build_quantity_keyboard(prod_id: str, var_id: str) -> Tuple[str, InlineKeybo
     stok = variant.get("stok", 0)
 
     text = (
-        f"📦 *PILIH JUMLAH*\n"
+        f"📦 *PILIH JUMLAH PESANAN*\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Berapa *{var_name}* yang ingin Anda beli?\n\n"
+        f"Berapa *{var_name}* yang ingin Anda pesan?\n\n"
         f"🪙 *Harga:* {harga_str} / item\n"
         f"📦 *Stok tersedia:* {stok}\n\n"
-        f"Pilih angka di bawah ini:"
+        f"💡 _Pilih jumlah di bawah atau klik Beli Langsung 1 Item:_"
     )
 
     keyboard = [
+        [
+            InlineKeyboardButton("⚡ Beli Langsung (1 Item) 💳", callback_data=f"qty:{prod_id}:{var_id}:1")
+        ],
         [
             InlineKeyboardButton("1", callback_data=f"qty:{prod_id}:{var_id}:1"),
             InlineKeyboardButton("2", callback_data=f"qty:{prod_id}:{var_id}:2"),
             InlineKeyboardButton("3", callback_data=f"qty:{prod_id}:{var_id}:3"),
             InlineKeyboardButton("4", callback_data=f"qty:{prod_id}:{var_id}:4"),
+            InlineKeyboardButton("5", callback_data=f"qty:{prod_id}:{var_id}:5"),
         ],
         [
-            InlineKeyboardButton("5", callback_data=f"qty:{prod_id}:{var_id}:5"),
             InlineKeyboardButton("6", callback_data=f"qty:{prod_id}:{var_id}:6"),
             InlineKeyboardButton("7", callback_data=f"qty:{prod_id}:{var_id}:7"),
             InlineKeyboardButton("8", callback_data=f"qty:{prod_id}:{var_id}:8"),
-        ],
-        [
             InlineKeyboardButton("9", callback_data=f"qty:{prod_id}:{var_id}:9"),
             InlineKeyboardButton("10", callback_data=f"qty:{prod_id}:{var_id}:10"),
         ],
@@ -371,7 +372,8 @@ def build_quantity_keyboard(prod_id: str, var_id: str) -> Tuple[str, InlineKeybo
 
 def build_checkout_keyboard(prod_id: str, var_id: str, qty: int) -> Tuple[str, InlineKeyboardMarkup]:
     """
-    Membuat tampilan detail pesanan dan tombol pemilihan metode pembayaran (Screen 5 referensi).
+    Membuat tampilan detail pesanan dengan Stepper Interaktif [➖] [📦 X Item] [➕]
+    dan tombol metode pembayaran (Screen 5 referensi).
     """
     product = get_product_by_id(prod_id)
     if not product:
@@ -383,6 +385,7 @@ def build_checkout_keyboard(prod_id: str, var_id: str, qty: int) -> Tuple[str, I
 
     var_name = variant.get("nama")
     harga_satuan = variant.get("harga", 0)
+    stok = variant.get("stok", 10)
     total_harga = harga_satuan * qty
     total_str = format_rupiah(total_harga)
 
@@ -390,13 +393,22 @@ def build_checkout_keyboard(prod_id: str, var_id: str, qty: int) -> Tuple[str, I
         f"🛍️ *DETAIL PESANAN*\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📦 *Produk:* {var_name}\n"
-        f"🖊️ *Jumlah:* {qty} item\n"
-        f"🪙 *Total Bayar:* *{total_str}* ✅\n"
+        f"🔢 *Jumlah:* {qty} item\n"
+        f"💰 *Total Bayar:* *{total_str}* ✅\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"✨ _Gunakan tombol ➖ dan ➕ di bawah untuk ubah jumlah secara langsung._\n\n"
         f"Silakan pilih metode pembayaran di bawah ini: 💳"
     )
 
+    prev_qty = max(1, qty - 1)
+    next_qty = min(stok, qty + 1)
+
     keyboard = [
+        [
+            InlineKeyboardButton("➖", callback_data=f"step:{prod_id}:{var_id}:{prev_qty}"),
+            InlineKeyboardButton(f"📦 {qty} Item ({total_str})", callback_data=f"step_info:{prod_id}:{var_id}:{qty}"),
+            InlineKeyboardButton("➕", callback_data=f"step:{prod_id}:{var_id}:{next_qty}")
+        ],
         [
             InlineKeyboardButton("📱 QRIS (Semua E-Wallet & Bank)", callback_data=f"pay:{prod_id}:{var_id}:{qty}:qris")
         ],
@@ -407,7 +419,8 @@ def build_checkout_keyboard(prod_id: str, var_id: str, qty: int) -> Tuple[str, I
             InlineKeyboardButton("💳 DANA / OVO / GoPay", callback_data=f"pay:{prod_id}:{var_id}:{qty}:ewallet")
         ],
         [
-            InlineKeyboardButton("◀️ Kembali", callback_data=f"var:{prod_id}:{var_id}")
+            InlineKeyboardButton("◀️ Ganti Varian", callback_data=f"prod:{prod_id}"),
+            InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_main")
         ]
     ]
 
@@ -489,6 +502,10 @@ def build_payment_instruction(prod_id: str, var_id: str, qty: int, method_code: 
     owner_msg, _ = format_owner_order_recap(order_data, chat_id, user_info, order_id=order_id)
 
     keyboard = [
+        [
+            InlineKeyboardButton("📸 Cara Kirim Bukti", callback_data="send_proof_hint"),
+            InlineKeyboardButton("💬 Hubungi Admin", url="https://t.me/Carlendra")
+        ],
         [
             InlineKeyboardButton("◀️ Kembali ke Menu Utama", callback_data="menu_main")
         ]

@@ -161,6 +161,63 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cust_call["chat_id"], chat_id)
         self.assertIn("Foto bukti pembayaran sudah kami terima", cust_call["text"])
 
+    async def test_stepper_interaction(self):
+        """Uji interaktivitas tombol Stepper (+) dan (-) pada layar checkout."""
+        chat_id = 112233
+        user = MagicMock(username="lnel_user", full_name="Lnel")
+        context = MagicMock()
+
+        # Step ke 2 item
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        update.effective_user = user
+        update.callback_query.data = "step:google_gemini_pro:gemini_1bln:2"
+        update.callback_query.answer = AsyncMock()
+        update.callback_query.edit_message_text = AsyncMock()
+
+        await main.handle_callback_query(update, context)
+
+        update.callback_query.answer.assert_called_once()
+        toast_text = update.callback_query.answer.call_args.args[0]
+        self.assertIn("2 item", toast_text)
+
+        update.callback_query.edit_message_text.assert_called_once()
+        edited_text = update.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("2 item", edited_text)
+
+    async def test_jasa_command_and_detail(self):
+        """Uji /jasa dan navigasi detail jasa."""
+        chat_id = 112233
+        user = MagicMock(username="lnel_user", full_name="Lnel")
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        update.effective_user = user
+        update.message.set_reaction = AsyncMock()
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        # Command /jasa
+        await main.jasa_command(update, context)
+        context.bot.send_message.assert_called_once()
+        jasa_text = context.bot.send_message.call_args.kwargs["text"]
+        self.assertIn("LAYANAN JASA PROFESIONAL", jasa_text)
+        self.assertIn("lynk.id/nellionel", jasa_text)
+
+        # Detail jasa landing page
+        update_detail = MagicMock()
+        update_detail.effective_chat.id = chat_id
+        update_detail.effective_user = user
+        update_detail.callback_query.data = "jasa_detail:jasa_landing_page"
+        update_detail.callback_query.answer = AsyncMock()
+        update_detail.callback_query.edit_message_text = AsyncMock()
+
+        await main.handle_callback_query(update_detail, context)
+        update_detail.callback_query.edit_message_text.assert_called_once()
+        detail_text = update_detail.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("LANDING PAGE", detail_text)
+        self.assertIn("Rp45.000", detail_text)
+
 
 if __name__ == "__main__":
     unittest.main()
