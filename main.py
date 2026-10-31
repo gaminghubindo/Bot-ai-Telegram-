@@ -280,11 +280,15 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             "❗ *BANTUAN & KETENTUAN GARANSI*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             f"{syarat}\n\n"
-            "✅ *Cara Klaim Garansi / Bantuan:*\n"
-            "Kirimkan chat langsung nomor pesanan Anda dan kendala yang dialami. "
-            "Admin atau asisten AI kami akan segera membantu Anda!"
+            "💬 *Bantuan Langsung:*\n"
+            "Jikalau ada masalah hubungi akun Telegram username @Carlendra\n\n"
+            "✅ *Cara Klaim Garansi:*\n"
+            "Kirimkan chat nomor pesanan Anda dan kendala yang dialami."
         )
-        markup = InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Kembali", callback_data="menu_main")]])
+        markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💬 Hubungi @Carlendra", url="https://t.me/Carlendra")],
+            [InlineKeyboardButton("◀️ Kembali", callback_data="menu_main")]
+        ])
         await edit_safe_message(query, text, markup)
         return
 
@@ -293,10 +297,13 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         text = (
             "👨‍💼 *LAYANAN CUSTOMER SERVICE*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "Silakan ketik pertanyaan atau kendala Anda langsung di chat ini! 💬\n\n"
-            "Asisten AI kami siap menjawab pertanyaan seputar produk, stok, garansi, dan bantuan lainnya 24/7."
+            "Jikalau ada masalah hubungi akun Telegram username @Carlendra\n\n"
+            "Asisten AI kami juga siap menjawab pertanyaan seputar produk, stok, garansi, dan panduan lainnya 24/7 di chat ini! 💬"
         )
-        markup = InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Kembali ke Menu", callback_data="menu_main")]])
+        markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💬 Chat Langsung @Carlendra", url="https://t.me/Carlendra")],
+            [InlineKeyboardButton("◀️ Kembali ke Menu", callback_data="menu_main")]
+        ])
         await edit_safe_message(query, text, markup)
         return
 
@@ -434,7 +441,16 @@ async def post_init(application: Application) -> None:
     try:
         await application.bot.set_my_commands(commands)
         await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-        logger.info("Tombol menu [ ☰ Menu ] Telegram berhasil dipasang!")
+        
+        # Atur deskripsi bot di Telegram
+        desc = "Pusat akun premium & langganan AI tools terpercaya. Jikalau ada masalah hubungi akun Telegram username @Carlendra"
+        try:
+            await application.bot.set_my_description(desc)
+            await application.bot.set_my_short_description(desc)
+        except Exception:
+            pass
+
+        logger.info("Tombol menu dan deskripsi bot Telegram berhasil dipasang!")
     except Exception as e:
         logger.warning(f"Gagal memasang tombol menu: {e}")
 
