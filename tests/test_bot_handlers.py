@@ -426,5 +426,49 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         btn_urls = [b.url for row in call_kwargs["reply_markup"].inline_keyboard for b in row if b.url]
         self.assertIn("https://t.me/Carlendra", btn_urls)
 
+
+    async def test_group_purchase_notification_and_topbuyer(self):
+        """Memverifikasi kartu notifikasi NEW PURCHASE ke Elva Group dan perintah /topbuyer."""
+        # 1. Cek pembentukan kartu NEW PURCHASE
+        sample_order = {
+            "items": [{"nama": "Google Pro 3 Bulan", "qty": 1, "harga": 20000}],
+            "total_harga": 20000,
+            "metode": "QRIS Dinamis"
+        }
+        card_text, card_markup = orders.build_group_purchase_notification(
+            sample_order, "5803366133", "ORD-20261031170109"
+        )
+        self.assertIn("NEW PURCHASE", card_text)
+        self.assertIn("580*****33", card_text)
+        self.assertIn("Google Pro 3 Bulan", card_text)
+        self.assertIn("Total Pembelian", card_text)
+
+        btn_urls = [b.url for row in card_markup.inline_keyboard for b in row if b.url]
+        self.assertTrue(any("start=katalog" in u for u in btn_urls))
+        self.assertTrue(any("start=menu" in u for u in btn_urls))
+
+        # 2. Cek broadcast ke grup
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        with patch.dict("os.environ", {"ELVA_GROUP_CHAT_ID": "-100123456789"}):
+            await main.broadcast_group_purchase(context, sample_order, "5803366133", "ORD-20261031170109")
+
+        context.bot.send_message.assert_called_once()
+        b_kwargs = context.bot.send_message.call_args.kwargs
+        self.assertEqual(b_kwargs["chat_id"], -100123456789)
+        self.assertIn("NEW PURCHASE", b_kwargs["text"])
+
+        # 3. Cek perintah /topbuyer
+        update = MagicMock()
+        update.effective_chat.id = "12345"
+        update.message.set_reaction = AsyncMock()
+        context.bot.send_message.reset_mock()
+
+        await main.topbuyer_command(update, context)
+        context.bot.send_message.assert_called_once()
+        t_kwargs = context.bot.send_message.call_args.kwargs
+        self.assertIn("LEADERBOARD PEMBELIAN TERBANYAK", t_kwargs["text"])
+
 if __name__ == "__main__":
     unittest.main()

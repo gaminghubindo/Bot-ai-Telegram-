@@ -1067,3 +1067,171 @@ def clear_pending_order(chat_id: int | str) -> None:
     key = str(chat_id)
     if key in _pending_orders:
         del _pending_orders[key]
+
+
+# ==========================================
+# NOTIFIKASI NEW PURCHASE & TOP BUYER GRUP
+# ==========================================
+
+def mask_customer_id(customer_id: int | str) -> str:
+    """Menyamarkan ID pengguna demi privasi, format persis seperti di grup: 651*****99."""
+    s = str(customer_id).strip()
+    if len(s) <= 4:
+        return s[:1] + "***" + s[-1:]
+    return s[:3] + "*****" + s[-2:]
+
+
+def mask_order_id(order_id: str) -> str:
+    """Menyamarkan No. Order, format persis seperti: Elva-26****-0109."""
+    s = str(order_id).strip()
+    if s.startswith("ORD-FL-"):
+        rest = s[7:]
+        return f"Elva-FL-{rest[:2]}****-{rest[-4:]}"
+    elif s.startswith("ORD-"):
+        rest = s[4:]
+        return f"Elva-{rest[:2]}****-{rest[-4:]}"
+    return s[:4] + "****" + s[-4:]
+
+
+def get_customer_purchase_count(customer_id: int | str) -> int:
+    """Menghitung total riwayat transaksi pembelian yang pernah dilakukan pelanggan."""
+    if not os.path.exists(ORDERS_CSV):
+        return 1
+    cnt = 0
+    cid_str = str(customer_id).strip()
+    try:
+        with open(ORDERS_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("customer_id", "").strip() == cid_str:
+                    cnt += 1
+    except Exception:
+        pass
+    return max(cnt, 1)
+
+
+def get_top_buyers(limit: int = 5) -> List[dict]:
+    """Mengambil daftar pelanggan dengan pembelian terbanyak dari orders.csv."""
+    if not os.path.exists(ORDERS_CSV):
+        return []
+
+    from collections import defaultdict
+    buyers = defaultdict(lambda: {"count": 0, "total_price": 0, "name": ""})
+
+    try:
+        with open(ORDERS_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                cid = row.get("customer_id", "").strip()
+                if not cid:
+                    continue
+                buyers[cid]["count"] += 1
+                try:
+                    buyers[cid]["total_price"] += int(float(row.get("total_price", 0) or 0))
+                except Exception:
+                    pass
+                if row.get("customer_name"):
+                    buyers[cid]["name"] = row.get("customer_name")
+    except Exception:
+        return []
+
+    sorted_buyers = sorted(buyers.items(), key=lambda x: (x[1]["count"], x[1]["total_price"]), reverse=True)
+    res = []
+    for cid, stats in sorted_buyers[:limit]:
+        res.append({
+            "customer_id": cid,
+            "masked_id": mask_customer_id(cid),
+            "name": stats["name"],
+            "count": stats["count"],
+            "total_price": stats["total_price"]
+        })
+    return res
+
+
+def build_group_purchase_notification(
+    order: dict,
+    chat_id: int | str,
+    order_id: str,
+    bot_username: str = "Profesional_umkm_bot"
+) -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Membuat kartu notifikasi NEW PURCHASE untuk dikirimkan ke Elva Group.
+    Format persis seperti di gambar BerryGrowID Grup.
+    """
+    masked_id = mask_customer_id(str(chat_id))
+    masked_oid = mask_order_id(order_id)
+
+    items = order.get("items", [])
+    if items:
+        prod_name = items[0].get("nama", "Produk Digital")
+        qty = sum(item.get("qty", 1) for item in items)
+    else:
+        prod_name = "Produk Digital"
+        qty = 1
+
+    total_purchases = get_customer_purchase_count(str(chat_id))
+
+    lines = [
+        "*Elva Group*\n",
+        "🎉 *NEW PURCHASE* 🎉",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        f"Pelanggan       `{masked_id}`",
+        f"Produk          *{prod_name}*",
+        f"Order           `{masked_oid}`",
+        f"Jumlah          {qty}",
+        f"Total Pembelian {total_purchases}",
+        "━━━━━━━━━━━━━━━━━━━━━━"
+    ]
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🛍️ Beli Produk ↗️", url=f"https://t.me/{bot_username}?start=katalog"),
+            InlineKeyboardButton("📲 Buka Bot ↗️", url=f"https://t.me/{bot_username}?start=menu")
+        ]
+    ]
+
+    return "\n".join(lines), InlineKeyboardMarkup(keyboard)
+
+
+def build_top_buyers_keyboard(limit: int = 5, bot_username: str = "Profesional_umkm_bot") -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Membuat tampilan leaderboard / peringkat pembeli terbanyak di Elva Tech.
+    """
+    top_list = get_top_buyers(limit)
+    lines = [
+        "🏆 *LEADERBOARD PEMBELIAN TERBANYAK* 🏆",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "_Daftar pelanggan setia dengan transaksi terbanyak di Elva Tech Store:_\n"
+    ]
+
+    medals = ["🥇", "🥈", "🥉", "🎖️", "🎖️"]
+
+    if not top_list:
+        lines.append("Belum ada riwayat transaksi yang tercatat.")
+    else:
+        for idx, buyer in enumerate(top_list):
+            medal = medals[idx] if idx < len(medals) else "🎖️"
+            masked_id = buyer["masked_id"]
+            count = buyer["count"]
+            total_fmt = f"Rp{buyer['total_price']:,}".replace(",", ".")
+            lines.append(
+                f"{medal} *Peringkat #{idx + 1} — Pelanggan `{masked_id}`*\n"
+                f"   • Total Pembelian: *{count}x Transaksi*\n"
+                f"   • Total Belanja: *{total_fmt}*\n"
+            )
+
+    lines.extend([
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "🔥 _Yuk tingkatkan transaksi kakak dan raih reward & diskon khusus Top Buyer!_"
+    ])
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🛍️ Beli Produk Sekarang ↗️", url=f"https://t.me/{bot_username}?start=katalog")
+        ],
+        [
+            InlineKeyboardButton("📢 Gabung Elva Group ↗️", url="https://t.me/+4_By8JH_MPg2Mjc9")
+        ]
+    ]
+
+    return "\n".join(lines), InlineKeyboardMarkup(keyboard)

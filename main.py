@@ -202,6 +202,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
         return
 
+    # Deep-linking support (e.g. /start katalog, /start top, /start freelance)
+    if context.args:
+        arg = context.args[0].lower()
+        if arg in ["katalog", "catalog"]:
+            text, reply_markup = orders.build_catalog_keyboard()
+            await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+            return
+        elif arg in ["top", "topbuyer", "leaderboard"]:
+            text, reply_markup = orders.build_top_buyers_keyboard(limit=5, bot_username="Profesional_umkm_bot")
+            await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+            return
+        elif arg in ["freelance", "job"]:
+            text, reply_markup = orders.build_freelance_preview_keyboard(chat_id, str(OWNER_CHAT_ID))
+            await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+            return
+
     text, reply_markup = orders.build_main_dashboard(chat_id, user_info)
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
 
@@ -264,6 +280,116 @@ async def grup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     chat_id = update.effective_chat.id
     text, reply_markup = orders.build_group_keyboard()
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+
+
+
+async def broadcast_group_purchase(
+    context: ContextTypes.DEFAULT_TYPE,
+    order_data: dict,
+    chat_id: int | str,
+    order_id: str
+) -> None:
+    """Mengirim kartu notifikasi NEW PURCHASE secara otomatis ke Elva Group."""
+    group_id = os.getenv("ELVA_GROUP_CHAT_ID", "").strip()
+    if not group_id:
+        logger.info("ELVA_GROUP_CHAT_ID belum disetel. Notifikasi grup dilewati.")
+        return
+
+    try:
+        text, markup = orders.build_group_purchase_notification(
+            order_data, chat_id, order_id, bot_username="Profesional_umkm_bot"
+        )
+        await context.bot.send_message(
+            chat_id=int(group_id),
+            text=text,
+            parse_mode=constants.ParseMode.MARKDOWN,
+            reply_markup=markup
+        )
+        logger.info(f"Notifikasi NEW PURCHASE berhasil dikirim ke grup {group_id}")
+    except Exception as e:
+        logger.warning(f"Gagal mengirim notifikasi NEW PURCHASE ke grup ({e})")
+
+
+async def topbuyer_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /topbuyer atau /leaderboard: Menampilkan peringkat pelanggan dengan pembelian terbanyak."""
+    if update.message:
+        await safe_react(update.message, "🏆")
+
+    chat_id = update.effective_chat.id
+    text, markup = orders.build_top_buyers_keyboard(limit=5, bot_username="Profesional_umkm_bot")
+    await send_safe_message(context, chat_id, text, reply_markup=markup)
+
+
+async def setgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /setgroup: Menyetel ELVA_GROUP_CHAT_ID saat dijalankan di dalam grup atau oleh owner."""
+    user = update.effective_user
+    chat = update.effective_chat
+    chat_id = chat.id
+
+    # Jika dijalankan di dalam grup / supergroup
+    if chat.type in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP]:
+        update_env_group_chat_id(str(chat_id))
+        os.environ["ELVA_GROUP_CHAT_ID"] = str(chat_id)
+        await send_safe_message(
+            context,
+            chat_id,
+            f"✅ *Elva Group Berhasil Disetel!* 🎉\n\nID Grup `{chat_id}` berhasil disimpan. "
+            "Mulai sekarang, histori pembelian produk (*NEW PURCHASE*) akan otomatis muncul di grup ini! 🛍️"
+        )
+        return
+
+    # Jika dijalankan di chat pribadi oleh owner
+    if OWNER_CHAT_ID and str(chat_id) == str(OWNER_CHAT_ID):
+        if context.args:
+            target_group_id = context.args[0].strip()
+            update_env_group_chat_id(target_group_id)
+            os.environ["ELVA_GROUP_CHAT_ID"] = target_group_id
+            await send_safe_message(context, chat_id, f"✅ *ID Elva Group Berhasil Disimpan!*\n\nID `{target_group_id}` telah disimpan ke .env.")
+            return
+        else:
+            current_id = os.getenv("ELVA_GROUP_CHAT_ID", "Belum disetel")
+            await send_safe_message(
+                context,
+                chat_id,
+                f"ℹ️ *Status ID Elva Group saat ini:* `{current_id}`\n\n"
+                "Untuk menyetelnya otomatis:\n"
+                "1. Undang bot ke Elva Group dan jadikan admin.\n"
+                "2. Ketik `/setgroup` di dalam grup tersebut, atau ketik `/setgroup <ID_GRUP>` di sini."
+            )
+            return
+
+
+async def testbroadcast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /testbroadcast: Mengirim contoh notifikasi NEW PURCHASE ke grup untuk testing."""
+    chat_id = update.effective_chat.id
+    if not OWNER_CHAT_ID or str(chat_id) != str(OWNER_CHAT_ID):
+        return
+
+    group_id = os.getenv("ELVA_GROUP_CHAT_ID", "").strip()
+    if not group_id:
+        await send_safe_message(context, chat_id, "⚠️ `ELVA_GROUP_CHAT_ID` belum disetel. Jalankan `/setgroup` di grup terlebih dahulu!")
+        return
+
+    sample_order = {
+        "items": [{"nama": "Google Pro 3 Bulan", "qty": 1, "harga": 20000}],
+        "total_harga": 20000,
+        "metode": "QRIS Dinamis"
+    }
+    sample_order_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    text, markup = orders.build_group_purchase_notification(
+        sample_order, chat_id, sample_order_id, bot_username="Profesional_umkm_bot"
+    )
+
+    try:
+        await context.bot.send_message(
+            chat_id=int(group_id),
+            text=text,
+            parse_mode=constants.ParseMode.MARKDOWN,
+            reply_markup=markup
+        )
+        await send_safe_message(context, chat_id, f"✅ Kartu contoh *NEW PURCHASE* berhasil dikirim ke grup `{group_id}`! Silakan cek Elva Group.")
+    except Exception as e:
+        await send_safe_message(context, chat_id, f"❌ Gagal mengirim ke grup: {e}\nPastikan bot sudah dijadikan admin di grup.")
 
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -574,6 +700,16 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("💳 Menyiapkan QR Code GoPay & tiket freelance... ✨")
         text, markup, owner_msg = orders.build_freelance_payment_instruction(method_code, chat_id, user_info)
 
+        # Broadcast notifikasi pembelian freelance ke grup
+        fl_order_data = {
+            "items": [{"nama": "Akses Info Freelancer", "qty": 1, "harga": 5000}],
+            "total_harga": 5000,
+            "metode": method_code
+        }
+        fl_oid_m = re.search(r'No\. Pesanan:\s*([^\n\r]+)', owner_msg)
+        fl_oid = fl_oid_m.group(1).strip() if fl_oid_m else f"ORD-FL-{chat_id}"
+        await broadcast_group_purchase(context, fl_order_data, chat_id, fl_oid)
+
         qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "qris_gopay.jpg")
         if method_code in ["qris", "gopay"] and os.path.exists(qr_path):
             try:
@@ -710,6 +846,19 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         text, markup, owner_msg = orders.build_payment_instruction(
             prod_id, var_id, qty, method_code, chat_id, user_info
         )
+
+        # Broadcast notifikasi pembelian produk ke grup
+        product = orders.get_product_by_id(prod_id)
+        variant = orders.get_variant_by_id(product, var_id)
+        prod_title = f"{product.get('nama', '')} {variant.get('nama', '')}".strip()
+        prod_order_data = {
+            "items": [{"nama": prod_title, "qty": qty, "harga": variant.get('harga', 0)}],
+            "total_harga": variant.get('harga', 0) * qty,
+            "metode": method_code
+        }
+        prod_oid_m = re.search(r'No\. Pesanan:\s*([^\n\r]+)', owner_msg)
+        prod_oid = prod_oid_m.group(1).strip() if prod_oid_m else f"ORD-{chat_id}"
+        await broadcast_group_purchase(context, prod_order_data, chat_id, prod_oid)
 
         qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "qris_gopay.jpg")
         if method_code == "qris" and os.path.exists(qr_path):
@@ -996,6 +1145,7 @@ async def post_init(application: Application) -> None:
         BotCommand("menu", "💎 Buka Menu & Katalog Produk"),
         BotCommand("freelance", "💼 Info Job Freelance (Rp5k)"),
         BotCommand("jasa", "🛠️ Layanan Jasa (Landing Page, Desain, 3D)"),
+        BotCommand("topbuyer", "🏆 Top Pembelian Terbanyak"),
         BotCommand("admin", "👨‍💼 Hubungi Admin (@Carlendra)"),
         BotCommand("grup", "📢 Gabung Elva Group (Info Restock)"),
         BotCommand("start", "🚀 Mulai / Dashboard Akun"),
@@ -1048,6 +1198,11 @@ def main() -> None:
     application.add_handler(CommandHandler("admin", admin_command))
     application.add_handler(CommandHandler("cs", admin_command))
     application.add_handler(CommandHandler("owner", admin_command))
+    application.add_handler(CommandHandler("topbuyer", topbuyer_command))
+    application.add_handler(CommandHandler("top", topbuyer_command))
+    application.add_handler(CommandHandler("leaderboard", topbuyer_command))
+    application.add_handler(CommandHandler("setgroup", setgroup_command))
+    application.add_handler(CommandHandler("testbroadcast", testbroadcast_command))
     application.add_handler(CommandHandler("freelance", freelance_command))
     application.add_handler(CommandHandler("freelancer", freelance_command))
     application.add_handler(CommandHandler("info_freelance", freelance_command))
