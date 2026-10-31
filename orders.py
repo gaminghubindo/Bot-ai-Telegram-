@@ -15,6 +15,40 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MENU_FILE = os.path.join(BASE_DIR, "data", "menu.json")
 ORDERS_CSV = os.path.join(BASE_DIR, "data", "orders.csv")
+VERIFIED_USERS_FILE = os.path.join(BASE_DIR, "data", "verified_users.json")
+
+
+def load_verified_users() -> set:
+    """Membaca daftar ID pengguna yang sudah terverifikasi bergabung di grup."""
+    if not os.path.exists(VERIFIED_USERS_FILE):
+        return set()
+    try:
+        with open(VERIFIED_USERS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return set(str(uid) for uid in data)
+    except Exception:
+        return set()
+
+
+def save_verified_user(user_id: int | str) -> None:
+    """Menyimpan ID pengguna yang telah bergabung ke file verified_users.json."""
+    users = load_verified_users()
+    users.add(str(user_id))
+    try:
+        os.makedirs(os.path.dirname(VERIFIED_USERS_FILE), exist_ok=True)
+        with open(VERIFIED_USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(list(users), f, indent=2)
+    except Exception:
+        pass
+
+
+def clear_verified_users() -> None:
+    """Menghapus data verified users (untuk keperluan testing)."""
+    if os.path.exists(VERIFIED_USERS_FILE):
+        try:
+            os.remove(VERIFIED_USERS_FILE)
+        except Exception:
+            pass
 
 # State pesanan sementara dalam memori: {chat_id: order_data}
 _pending_orders: Dict[str, dict] = {}
@@ -123,6 +157,43 @@ def build_group_keyboard() -> Tuple[str, InlineKeyboardMarkup]:
 # ==========================================
 # PEMBUATAN INLINE KEYBOARD (UI SEPERTI BerryGrowID)
 # ==========================================
+
+def build_gatekeeper_keyboard(user_info: dict) -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Membuat tampilan Gatekeeper / Akses Terkunci.
+    Pengguna diwajibkan bergabung ke Elva Group sebelum bisa mengakses bot.
+    """
+    grp = get_group_info()
+    full_name = user_info.get("full_name", "Pelanggan")
+
+    text = (
+        f"🔒 *AKSES TERKUNCI — SILAKAN GABUNG ELVA GROUP DAHULU*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Halo kak *{full_name}*! 👋\n\n"
+        f"Untuk mengakses katalog produk *Elva Tech* dan konsultasi dengan asisten AI, "
+        f"Anda diwajibkan bergabung ke grup resmi kami terlebih dahulu.\n\n"
+        f"📢 *Keuntungan Bergabung ke {grp['nama']}:*\n"
+        f"🔔 *Info Reset Stok*: Notifikasi instan saat stok akun ready kembali!\n"
+        f"⚡ *Flash Sale*: Diskon dan harga khusus member grup.\n"
+        f"💡 *Update & Bantuan*: Informasi tips dan konsultasi AI.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 *3 Langkah Cepat untuk Membuka Akses:*\n"
+        f"1. Klik tombol *[ 📢 Gabung Elva Group ]* di bawah.\n"
+        f"2. Tekan tombol *Join / Gabung* di grup Telegram.\n"
+        f"3. Kembali ke chat ini lalu klik tombol *[ ✅ Saya Sudah Bergabung ]*."
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("📢 Gabung Elva Group (Wajib)", url=grp["url"])
+        ],
+        [
+            InlineKeyboardButton("✅ Saya Sudah Bergabung", callback_data="check_joined")
+        ]
+    ]
+
+    return text, InlineKeyboardMarkup(keyboard)
+
 
 def build_main_dashboard(chat_id: int | str, user_info: dict) -> Tuple[str, InlineKeyboardMarkup]:
     """

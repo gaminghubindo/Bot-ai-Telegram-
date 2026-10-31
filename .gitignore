@@ -3,9 +3,13 @@
 .env.local
 *.env
 
-# Data pesanan pelanggan
+# Data pesanan pelanggan & verifikasi pengguna
 data/orders.csv
+data/verified_users.json
 *.csv
+
+# Scratch directory
+scratch/
 
 # Python cache & virtual environment
 __pycache__/

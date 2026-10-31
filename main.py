@@ -100,6 +100,53 @@ async def safe_react(message, emoji: str) -> None:
 # COMMAND HANDLERS (/start, /menu, /id)
 # ==========================================
 
+def update_env_group_chat_id(group_id: str) -> None:
+    """Menyimpan ID grup ke file .env secara otomatis."""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_path):
+        try:
+            with open(env_path, "r", encoding="utf-8") as f:
+                env_content = f.read()
+            if "ELVA_GROUP_CHAT_ID=" in env_content:
+                env_content = re.sub(r"ELVA_GROUP_CHAT_ID=.*", f"ELVA_GROUP_CHAT_ID={group_id}", env_content)
+            else:
+                env_content += f"\nELVA_GROUP_CHAT_ID={group_id}\n"
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.write(env_content)
+            logger.info(f"ELVA_GROUP_CHAT_ID={group_id} berhasil disimpan ke .env!")
+        except Exception as e:
+            logger.error(f"Gagal update ELVA_GROUP_CHAT_ID di .env: {e}")
+
+
+async def is_user_verified(context: ContextTypes.DEFAULT_TYPE, user_id: int | str) -> bool:
+    """
+    Memeriksa apakah pengguna sudah bergabung di Elva Group.
+    Pemilik toko selalu diizinkan lewat.
+    """
+    uid_str = str(user_id)
+
+    # 1. Pemilik toko selalu terverifikasi
+    if OWNER_CHAT_ID and uid_str == str(OWNER_CHAT_ID):
+        return True
+
+    # 2. Cek via Telegram API jika ELVA_GROUP_CHAT_ID tersedia
+    elva_group_chat_id = os.getenv("ELVA_GROUP_CHAT_ID", "").strip()
+    if elva_group_chat_id:
+        try:
+            member = await context.bot.get_chat_member(chat_id=int(elva_group_chat_id), user_id=int(user_id))
+            if member.status in ["member", "administrator", "creator", "restricted"]:
+                orders.save_verified_user(uid_str)
+                return True
+            else:
+                return False
+        except Exception as e:
+            logger.warning(f"Cek get_chat_member error ({e}), memeriksa status lokal...")
+
+    # 3. Fallback: cek riwayat konfirmasi lokal
+    verified_users = orders.load_verified_users()
+    return uid_str in verified_users
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /start: Menampilkan Dashboard Akun & Menu Tombol Interaktif."""
     if update.message:
@@ -116,6 +163,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         "username": user.username if user else "",
         "full_name": user.full_name if user else "Pelanggan"
     }
+
+    # Gerbang Verifikasi: Wajib Gabung Elva Group
+    verified = await is_user_verified(context, chat_id)
+    if not verified:
+        text, reply_markup = orders.build_gatekeeper_keyboard(user_info)
+        await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+        return
 
     text, reply_markup = orders.build_main_dashboard(chat_id, user_info)
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
@@ -135,6 +189,13 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "full_name": user.full_name if user else "Pelanggan"
     }
 
+    # Gerbang Verifikasi: Wajib Gabung Elva Group
+    verified = await is_user_verified(context, chat_id)
+    if not verified:
+        text, reply_markup = orders.build_gatekeeper_keyboard(user_info)
+        await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+        return
+
     text, reply_markup = orders.build_main_dashboard(chat_id, user_info)
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
 
@@ -144,7 +205,22 @@ async def jasa_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if update.message:
         await safe_react(update.message, "👨‍💻")
 
+    user = update.effective_user
     chat_id = update.effective_chat.id
+
+    user_info = {
+        "chat_id": chat_id,
+        "username": user.username if user else "",
+        "full_name": user.full_name if user else "Pelanggan"
+    }
+
+    # Gerbang Verifikasi: Wajib Gabung Elva Group
+    verified = await is_user_verified(context, chat_id)
+    if not verified:
+        text, reply_markup = orders.build_gatekeeper_keyboard(user_info)
+        await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+        return
+
     text, reply_markup = orders.build_jasa_keyboard()
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
 
@@ -217,9 +293,26 @@ async def restock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler /id: Menampilkan Chat ID Telegram pengguna."""
+    """Handler /id: Menampilkan Chat ID Telegram pengguna atau grup."""
     if update.message:
         await safe_react(update.message, "👍")
+
+    # Jika dipanggil di dalam grup
+    if update.effective_chat and update.effective_chat.type in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP]:
+        group_id = update.effective_chat.id
+        group_title = update.effective_chat.title or "Grup"
+        update_env_group_chat_id(str(group_id))
+        os.environ["ELVA_GROUP_CHAT_ID"] = str(group_id)
+
+        msg = (
+            "👥 *Informasi Grup Telegram*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Nama Grup: *{group_title}*\n"
+            f"Chat ID Grup: `{group_id}`\n\n"
+            "✅ *ID ini otomatis digunakan untuk verifikasi anggota Elva Group!*"
+        )
+        await send_safe_message(context, group_id, msg)
+        return
 
     user = update.effective_user
     chat_id = update.effective_chat.id
@@ -258,6 +351,44 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         "username": user.username if user else "",
         "full_name": user.full_name if user else "Pelanggan"
     }
+
+    # 0. Verifikasi Tombol 'Saya Sudah Bergabung'
+    if data == "check_joined":
+        elva_group_chat_id = os.getenv("ELVA_GROUP_CHAT_ID", "").strip()
+        if elva_group_chat_id:
+            try:
+                member = await context.bot.get_chat_member(chat_id=int(elva_group_chat_id), user_id=int(chat_id))
+                if member.status in ["member", "administrator", "creator", "restricted"]:
+                    orders.save_verified_user(chat_id)
+                    await query.answer("🎉 Terima kasih sudah bergabung! Akses Elva Tech terbuka ✨", show_alert=True)
+                    text, markup = orders.build_main_dashboard(chat_id, user_info)
+                    await edit_safe_message(query, text, markup)
+                    return
+                else:
+                    await query.answer(
+                        "⚠️ Akun Anda belum terdeteksi di Elva Group nih kak!\n\n"
+                        "Silakan klik tombol '📢 Gabung Elva Group' di atas dan klik 'Join', "
+                        "lalu tekan tombol ini lagi yaa! 🙏",
+                        show_alert=True
+                    )
+                    return
+            except Exception as e:
+                logger.warning(f"Error checking group member: {e}")
+
+        # Fallback konfirmasi klik jika ELVA_GROUP_CHAT_ID belum ada
+        orders.save_verified_user(chat_id)
+        await query.answer("🎉 Terima kasih sudah bergabung ke Elva Group! Akses Elva Tech telah terbuka ✨", show_alert=True)
+        text, markup = orders.build_main_dashboard(chat_id, user_info)
+        await edit_safe_message(query, text, markup)
+        return
+
+    # Gerbang Verifikasi: Wajib Gabung Elva Group untuk tombol lainnya
+    verified = await is_user_verified(context, chat_id)
+    if not verified and data != "view_group":
+        await query.answer("🔒 Akses terkunci! Silakan bergabung ke Elva Group terlebih dahulu ya kak 🙏", show_alert=True)
+        text, markup = orders.build_gatekeeper_keyboard(user_info)
+        await edit_safe_message(query, text, markup)
+        return
 
     # 1. Kembali ke Menu Dashboard Utama
     if data == "menu_main":
@@ -509,6 +640,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "username": user.username if user else "",
         "full_name": user.full_name if user else "Pelanggan"
     }
+
+    # Jika pesan dikirim di dalam grup, rekam Chat ID grup otomatis
+    if update.effective_chat and update.effective_chat.type in [constants.ChatType.GROUP, constants.ChatType.SUPERGROUP]:
+        grp_id = update.effective_chat.id
+        if not os.getenv("ELVA_GROUP_CHAT_ID", "").strip():
+            update_env_group_chat_id(str(grp_id))
+            os.environ["ELVA_GROUP_CHAT_ID"] = str(grp_id)
+            logger.info(f"Otomatis mendeteksi ELVA_GROUP_CHAT_ID: {grp_id}")
+        return
+
+    # Gerbang Verifikasi: Wajib Gabung Elva Group untuk chat AI di private chat
+    verified = await is_user_verified(context, chat_id)
+    if not verified:
+        text, markup = orders.build_gatekeeper_keyboard(user_info)
+        await send_safe_message(context, chat_id, text, reply_markup=markup)
+        return
 
     clean_lower = user_text.lower()
 

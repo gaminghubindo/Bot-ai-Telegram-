@@ -21,6 +21,7 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         memory.clear_history(112233)
         orders.clear_pending_order(112233)
+        orders.save_verified_user(112233)
 
     async def test_start_command(self):
         """Uji /start menampilkan dashboard akun & tombol interaktif."""
@@ -267,6 +268,45 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("NOTIFIKASI RESTOCK", sent_msg)
         self.assertIn("Gemini Pro sudah restock 20 akun!", sent_msg)
 
+
+    async def test_gatekeeper_unverified_user(self):
+        """Uji gerbang verifikasi Elva Group: user belum gabung diblokir sampai klik check_joined."""
+        unverified_id = 778899
+        orders.clear_verified_users()
+
+        user = MagicMock(username="newbie", full_name="User Baru")
+        update = MagicMock()
+        update.effective_chat.id = unverified_id
+        update.effective_chat.type = "private"
+        update.effective_user = user
+        update.message.set_reaction = AsyncMock()
+        update.message.text = "Halo bot saya mau beli akun"
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        # 1. User belum gabung coba /start -> Diberi tampilan Gerbang Verifikasi
+        await main.start_command(update, context)
+        context.bot.send_message.assert_called_once()
+        msg_text = context.bot.send_message.call_args.kwargs["text"]
+        self.assertIn("AKSES TERKUNCI", msg_text)
+        self.assertIn("ELVA GROUP", msg_text)
+
+        # 2. User klik tombol 'Saya Sudah Bergabung' (check_joined)
+        update_cb = MagicMock()
+        update_cb.effective_chat.id = unverified_id
+        update_cb.effective_user = user
+        update_cb.callback_query.data = "check_joined"
+        update_cb.callback_query.answer = AsyncMock()
+        update_cb.callback_query.edit_message_text = AsyncMock()
+
+        await main.handle_callback_query(update_cb, context)
+        update_cb.callback_query.edit_message_text.assert_called_once()
+        dash_text = update_cb.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("ACCOUNT", dash_text)
+
+        # 3. Sekarang user sudah terverifikasi
+        self.assertTrue(orders.load_verified_users().__contains__(str(unverified_id)))
 
 if __name__ == "__main__":
     unittest.main()
