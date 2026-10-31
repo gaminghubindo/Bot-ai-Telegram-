@@ -628,19 +628,14 @@ async def post_init(application: Application) -> None:
         await application.bot.set_my_commands(commands)
         await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         
-        # Atur deskripsi bot di Telegram (Muncul saat chat pertama kali dibuka)
+        # Atur deskripsi bot di Telegram (Muncul saat chat pertama kali dibuka, maks 512 karakter)
         desc = (
-            "Selamat datang di Elva Tech — Toko Digital & Layanan Jasa Kreatif UMKM!\n\n"
-            "💎 Produk Digital:\n"
-            "Akun AI & Desain Premium (Gemini Pro, ChatGPT, Canva Pro, Netflix, dll).\n\n"
-            "🛠️ Layanan Jasa Profesional:\n"
-            "• Pembuatan Landing Page UMKM (Rp45.000)\n"
-            "• Desain Presentasi PPT & Canva (Rp2.000 / slide)\n"
-            "• 3D Modeling & Rendering Produk (Rp90.000)\n\n"
-            "📢 Elva Group (Info Restock & Reset Stok):\n"
-            "Gabung grup agar selalu dapat notif saat stok akun ready!\n\n"
-            "🌐 Website Resmi Lynk.id: https://lynk.id/nellionel\n"
-            "💬 Tanya-tanya & Konsultasi Jasa: Hubungi Telegram @Carlendra"
+            "Selamat datang di Elva Tech — Toko Digital & Jasa Kreatif UMKM!\n\n"
+            "💎 Produk Digital: Akun AI (Gemini Pro, ChatGPT), Canva, Netflix, dll.\n"
+            "🛠️ Layanan Jasa: Landing Page (Rp45rb), Desain PPT (Rp2rb/slide), 3D Modeling (Rp90rb).\n"
+            "📢 Elva Group: Update restock & reset stok akun.\n"
+            "🌐 Website Resmi: https://lynk.id/nellionel\n"
+            "💬 Konsultasi & Bantuan: Hubungi Telegram @Carlendra"
         )
         short_desc = "Elva Tech: Jasa Kreatif, Akun Digital & Info Restock Elva Group. CS: @Carlendra"
         try:
