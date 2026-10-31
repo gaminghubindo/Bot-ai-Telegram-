@@ -264,5 +264,39 @@
         }
       ]
     }
-  ]
+  ],
+  "layanan_jasa": {
+    "lynk_url": "https://lynk.id/nellionel",
+    "kontak_konsultasi": "@Carlendra",
+    "tagline": "Sebagian besar landing page gagal menghasilkan penjualan bukan karena visualnya jelek, melainkan karena alurnya membingungkan dan tidak memahami kebutuhan calon pembeli.",
+    "daftar_jasa": [
+      {
+        "id": "jasa_landing_page",
+        "nama": "Jasa Pembuatan Landing Page UMKM",
+        "icon": "🌐",
+        "harga": 45000,
+        "harga_format": "Rp45.000",
+        "link_lynk": "https://lynk.id/nellionel/58oz144pzexx",
+        "deskripsi": "Pembuatan landing page profesional khusus UMKM dengan alur penjualan terarah, visual rapi, cepat, dan responsif di HP. Dirancang untuk memaksimalkan konversi penjualan produk Anda."
+      },
+      {
+        "id": "jasa_desain_ppt",
+        "nama": "Jasa Desain Presentasi PPT & Canva",
+        "icon": "🎨",
+        "harga": 2000,
+        "harga_format": "Rp2.000 / slide",
+        "link_lynk": "https://lynk.id/nellionel",
+        "deskripsi": "Jasa desain & perapihan slide presentasi profesional (PowerPoint / Canva) untuk materi pitching, proposal bisnis, portofolio, dan materi presentasi tugas dengan visual elegan."
+      },
+      {
+        "id": "jasa_3d_modeling",
+        "nama": "Jasa 3D Modeling & Rendering Produk",
+        "icon": "🧊",
+        "harga": 90000,
+        "harga_format": "Rp90.000",
+        "link_lynk": "https://lynk.id/nellionel/4g669717qp4e",
+        "deskripsi": "Jasa pembuatan model 3D produk dan visual mockup 3D berkualitas tinggi untuk kebutuhan display katalog produk, iklan promosi, dan visualisasi produk fisik Anda."
+      }
+    ]
+  }
 }

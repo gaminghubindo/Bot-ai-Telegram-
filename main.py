@@ -123,6 +123,13 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
 
 
+async def jasa_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /jasa: Menampilkan menu layanan jasa profesional dari Lynk.id."""
+    chat_id = update.effective_chat.id
+    text, reply_markup = orders.build_jasa_keyboard()
+    await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+
+
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /id: Menampilkan Chat ID Telegram pengguna."""
     user = update.effective_user
@@ -174,6 +181,19 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     # 2. Lihat Katalog Produk Lengkap (Grid)
     if data == "view_catalog":
         text, markup = orders.build_catalog_keyboard()
+        await edit_safe_message(query, text, markup)
+        return
+
+    # 2b. Lihat Layanan Jasa (Landing Page, Desain, 3D)
+    if data == "view_jasa":
+        text, markup = orders.build_jasa_keyboard()
+        await edit_safe_message(query, text, markup)
+        return
+
+    # 2c. Lihat Detail Jasa Tertentu
+    if data.startswith("jasa_detail:"):
+        jasa_id = data.split(":", 1)[1]
+        text, markup = orders.build_jasa_detail_keyboard(jasa_id)
         await edit_safe_message(query, text, markup)
         return
 
@@ -435,6 +455,7 @@ async def post_init(application: Application) -> None:
     """Mendaftarkan tombol menu native [ ☰ Menu ] di samping kiri kolom chat Telegram."""
     commands = [
         BotCommand("menu", "💎 Buka Menu & Katalog Produk"),
+        BotCommand("jasa", "🛠️ Layanan Jasa (Landing Page, Desain, 3D)"),
         BotCommand("start", "🚀 Mulai / Dashboard Akun"),
         BotCommand("id", "🆔 Cek Chat ID Akun Saya"),
     ]
@@ -443,10 +464,10 @@ async def post_init(application: Application) -> None:
         await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         
         # Atur deskripsi bot di Telegram
-        desc = "Pusat akun premium & langganan AI tools terpercaya. Jikalau ada masalah hubungi akun Telegram username @Carlendra"
+        desc = "Pusat akun premium & layanan jasa profesional (Landing Page, Desain, 3D). Website resmi: https://lynk.id/nellionel. Jikalau ada masalah atau ingin tanya lebih lanjut hubungi akun Telegram @Carlendra."
         try:
             await application.bot.set_my_description(desc)
-            await application.bot.set_my_short_description(desc)
+            await application.bot.set_my_short_description("Layanan Jasa & Akun Digital. Konsultasi Telegram: @Carlendra")
         except Exception:
             pass
 
@@ -472,6 +493,7 @@ def main() -> None:
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", menu_command))
+    application.add_handler(CommandHandler("jasa", jasa_command))
     application.add_handler(CommandHandler("id", id_command))
 
     # Callback query handler (Tombol Interaktif)

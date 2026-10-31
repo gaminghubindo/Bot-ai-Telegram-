@@ -112,7 +112,8 @@ def build_main_dashboard(chat_id: int | str, user_info: dict) -> Tuple[str, Inli
             InlineKeyboardButton("🔥 GEMINI PRO & AI SPECIAL", callback_data="prod:google_gemini_pro")
         ],
         [
-            InlineKeyboardButton("🪙 Katalog Produk", callback_data="view_catalog")
+            InlineKeyboardButton("🪙 Katalog Produk", callback_data="view_catalog"),
+            InlineKeyboardButton("🛠️ Layanan Jasa", callback_data="view_jasa")
         ],
         [
             InlineKeyboardButton("📦 Pesanan Saya", callback_data="my_orders"),
@@ -124,6 +125,109 @@ def build_main_dashboard(chat_id: int | str, user_info: dict) -> Tuple[str, Inli
         ],
         [
             InlineKeyboardButton("👨‍💼 Hubungi CS / Admin", callback_data="contact_admin")
+        ]
+    ]
+
+    return text, InlineKeyboardMarkup(keyboard)
+
+
+def build_jasa_keyboard() -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Membuat tampilan daftar layanan jasa (Landing Page, Desain PPT/Canva, 3D Modeling).
+    """
+    menu_data = load_menu()
+    jasa_data = menu_data.get("layanan_jasa", {})
+    lynk_url = jasa_data.get("lynk_url", "https://lynk.id/nellionel")
+    tagline = jasa_data.get("tagline", "")
+    daftar = jasa_data.get("daftar_jasa", [])
+
+    lines = [
+        "🛠️ *LAYANAN JASA PROFESIONAL*",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        f"_{tagline}_\n",
+        "🌐 *Website Resmi Lynk.id:*",
+        f"{lynk_url}\n",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "📌 *Daftar Layanan Jasa Kami:*\n"
+    ]
+
+    for j in daftar:
+        icon = j.get("icon", "💼")
+        nama = j.get("nama")
+        harga = j.get("harga_format")
+        desc = j.get("deskripsi")
+        lines.append(f"{icon} *{nama}*")
+        lines.append(f"   • Tarif: *{harga}*")
+        lines.append(f"   • _{desc}_\n")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("💬 *KONSULTASI & TANYA LEBIH LANJUT:*")
+    lines.append("Untuk diskusi brief, konsultasi kebutuhan proyek, atau tanya-tanya lebih lanjut seputar jasa, silakan hubungi akun Telegram: *@Carlendra* 😊")
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🌐 Detail Landing Page", callback_data="jasa_detail:jasa_landing_page"),
+            InlineKeyboardButton("🎨 Detail Desain PPT", callback_data="jasa_detail:jasa_desain_ppt")
+        ],
+        [
+            InlineKeyboardButton("🧊 Detail 3D Modeling", callback_data="jasa_detail:jasa_3d_modeling")
+        ],
+        [
+            InlineKeyboardButton("🔗 Buka Website Lynk.id", url=lynk_url),
+            InlineKeyboardButton("💬 Chat Telegram @Carlendra", url="https://t.me/Carlendra")
+        ],
+        [
+            InlineKeyboardButton("◀️ Kembali ke Menu Utama", callback_data="menu_main")
+        ]
+    ]
+
+    return "\n".join(lines), InlineKeyboardMarkup(keyboard)
+
+
+def build_jasa_detail_keyboard(jasa_id: str) -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Membuat tampilan detail spesifik dari salah satu layanan jasa.
+    """
+    menu_data = load_menu()
+    jasa_data = menu_data.get("layanan_jasa", {})
+    lynk_url = jasa_data.get("lynk_url", "https://lynk.id/nellionel")
+    daftar = jasa_data.get("daftar_jasa", [])
+
+    selected = None
+    for j in daftar:
+        if j.get("id") == jasa_id:
+            selected = j
+            break
+
+    if not selected:
+        return "Layanan tidak ditemukan.", InlineKeyboardMarkup([[InlineKeyboardButton("◀️ Kembali", callback_data="view_jasa")]])
+
+    icon = selected.get("icon", "💼")
+    nama = selected.get("nama")
+    harga = selected.get("harga_format")
+    desc = selected.get("deskripsi")
+    link = selected.get("link_lynk", lynk_url)
+
+    text = (
+        f"{icon} *{nama.upper()}*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 *Tarif:* *{harga}*\n\n"
+        f"📝 *Deskripsi Layanan:*\n"
+        f"{desc}\n\n"
+        f"🌐 *Pemesanan Langsung di Lynk.id:*\n"
+        f"{link}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💬 *Ingin bertanya atau konsultasi lebih lanjut?*\n"
+        f"Silakan langsung hubungi akun Telegram: *@Carlendra*"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🛒 Order via Lynk.id", url=link),
+            InlineKeyboardButton("💬 Konsultasi @Carlendra", url="https://t.me/Carlendra")
+        ],
+        [
+            InlineKeyboardButton("◀️ Kembali ke Menu Jasa", callback_data="view_jasa")
         ]
     ]
 
