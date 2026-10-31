@@ -1,0 +1,27 @@
+# Environment variables (JANGAN PERNAH DI-COMMIT)
+.env
+.env.local
+*.env
+
+# Data pesanan pelanggan
+data/orders.csv
+*.csv
+
+# Python cache & virtual environment
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+ENV/
+
+# Log files
+*.log
+logs/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
