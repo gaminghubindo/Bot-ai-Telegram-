@@ -311,7 +311,7 @@ def build_main_dashboard(chat_id: int | str, user_info: dict) -> Tuple[str, Inli
             InlineKeyboardButton("❗ Bantuan & Garansi", callback_data="help_info")
         ],
         [
-            InlineKeyboardButton("👨‍💼 Hubungi CS / Admin", callback_data="contact_admin")
+            InlineKeyboardButton("👨‍💼 Hubungi Admin (@Carlendra)", url="https://t.me/Carlendra")
         ]
     ]
 

@@ -266,6 +266,46 @@ async def grup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
 
 
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /admin, /cs, /owner: Langsung mengarahkan ke akun Telegram pemilik (@Carlendra)."""
+    if update.message:
+        await safe_react(update.message, "👨‍💼")
+
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    user_info = {
+        "chat_id": chat_id,
+        "username": user.username if user else "",
+        "full_name": user.full_name if user else "Pelanggan"
+    }
+
+    if OWNER_CHAT_ID and OWNER_CHAT_ID != "your_chat_id_here" and str(chat_id) != str(OWNER_CHAT_ID):
+        notif = (
+            "🔔 *PELANGGAN INGIN MENGHUBUNGI ADMIN*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 Pelanggan: *{user_info['full_name']}* (@{user_info['username'] or '-'})\n"
+            f"🆔 Chat ID: `{chat_id}`\n"
+            "💬 Pelanggan baru saja membuka menu /admin untuk menghubungi Anda."
+        )
+        try:
+            await send_safe_message(context, OWNER_CHAT_ID, notif)
+        except Exception:
+            pass
+
+    msg_text = (
+        "👨‍💼 *HUBUNGI ADMIN (@Carlendra)*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "Ada pertanyaan, kendala pesanan, konsultasi, atau butuh bantuan langsung dari pemilik toko?\n\n"
+        "Silakan langsung klik tombol di bawah untuk membuka chat pribadi langsung ke akun Telegram admin kami:\n"
+        "👉 *@Carlendra*"
+    )
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💬 Chat Langsung @Carlendra", url="https://t.me/Carlendra")],
+        [InlineKeyboardButton("◀️ Kembali ke Menu", callback_data="menu_main")]
+    ])
+    await send_safe_message(context, chat_id, msg_text, reply_markup=markup)
+
+
 async def freelance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /freelance: Menampilkan preview lowongan freelance atau detail bagi yang sudah unlock."""
     if update.message:
@@ -830,13 +870,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     clean_lower = user_text.lower()
 
-    # Deteksi komplain langsung
+    # Deteksi komplain atau keinginan menghubungi admin langsung
     is_direct_complaint = False
-    complaint_keywords = [
+    admin_contact_keywords = [
         "komplain", "kecewa", "rusak", "tidak bisa login", "salah password",
-        "kena banned", "garansi", "ganti akun", "bicara sama admin", "bicara sama pemilik"
+        "kena banned", "garansi", "ganti akun", "bicara sama admin", "bicara sama pemilik",
+        "pesan admin", "chat admin", "hubungi admin", "kontak admin", "ngomong sama admin",
+        "tanya admin", "admin tele", "tele admin", "akun admin", "hubungi pemilik"
     ]
-    if any(k in clean_lower for k in complaint_keywords):
+    if any(k in clean_lower for k in admin_contact_keywords):
         is_direct_complaint = True
 
     # Simpan riwayat chat ke memori
@@ -875,11 +917,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             except Exception as e:
                 logger.error(f"Gagal mengirim eskalasi ke owner: {e}")
 
-    # Kirim balasan AI ke pelanggan beserta tombol pintasan ke katalog
-    shortcut_markup = InlineKeyboardMarkup([
+    # Kirim balasan AI ke pelanggan beserta tombol pintasan
+    buttons = [
         [InlineKeyboardButton("🪙 Buka Katalog Produk", callback_data="view_catalog")],
         [InlineKeyboardButton("📋 Menu Utama", callback_data="menu_main")]
-    ])
+    ]
+    if is_direct_complaint or raw_escalate:
+        buttons.insert(0, [InlineKeyboardButton("💬 Chat Langsung @Carlendra", url="https://t.me/Carlendra")])
+    shortcut_markup = InlineKeyboardMarkup(buttons)
 
     memory.add_message(chat_id, "assistant", cleaned_reply)
     await send_safe_message(context, chat_id, cleaned_reply, reply_markup=shortcut_markup)
@@ -951,6 +996,7 @@ async def post_init(application: Application) -> None:
         BotCommand("menu", "💎 Buka Menu & Katalog Produk"),
         BotCommand("freelance", "💼 Info Job Freelance (Rp5k)"),
         BotCommand("jasa", "🛠️ Layanan Jasa (Landing Page, Desain, 3D)"),
+        BotCommand("admin", "👨‍💼 Hubungi Admin (@Carlendra)"),
         BotCommand("grup", "📢 Gabung Elva Group (Info Restock)"),
         BotCommand("start", "🚀 Mulai / Dashboard Akun"),
         BotCommand("id", "🆔 Cek Chat ID Akun Saya"),
@@ -999,6 +1045,9 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("jasa", jasa_command))
+    application.add_handler(CommandHandler("admin", admin_command))
+    application.add_handler(CommandHandler("cs", admin_command))
+    application.add_handler(CommandHandler("owner", admin_command))
     application.add_handler(CommandHandler("freelance", freelance_command))
     application.add_handler(CommandHandler("freelancer", freelance_command))
     application.add_handler(CommandHandler("info_freelance", freelance_command))

@@ -398,5 +398,33 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
             j["status"] = "aktif"
         orders.save_freelance_data(fl_data)
 
+    async def test_admin_direct_link_and_command(self):
+        """Memverifikasi bahwa tombol Hubungi Admin dan perintah /admin langsung mengarah ke t.me/Carlendra."""
+        # 1. Cek tombol di main dashboard
+        user_info = {"chat_id": "123", "username": "testuser", "full_name": "Test User"}
+        _, markup = orders.build_main_dashboard("123", user_info)
+        admin_btns = [b for row in markup.inline_keyboard for b in row if "Hubungi Admin" in b.text]
+        self.assertEqual(len(admin_btns), 1)
+        self.assertEqual(admin_btns[0].url, "https://t.me/Carlendra")
+
+        # 2. Cek handler /admin
+        update = MagicMock()
+        update.effective_chat.id = "12345"
+        update.effective_user.username = "testuser"
+        update.effective_user.full_name = "Test User"
+        update.message.set_reaction = AsyncMock()
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        with patch.object(main, "OWNER_CHAT_ID", "5803366133"):
+            await main.admin_command(update, context)
+
+        # Memastikan mengirim balasan dengan tombol ke @Carlendra
+        context.bot.send_message.assert_called()
+        call_kwargs = context.bot.send_message.call_args.kwargs
+        self.assertIn("@Carlendra", call_kwargs["text"])
+        btn_urls = [b.url for row in call_kwargs["reply_markup"].inline_keyboard for b in row if b.url]
+        self.assertIn("https://t.me/Carlendra", btn_urls)
+
 if __name__ == "__main__":
     unittest.main()
