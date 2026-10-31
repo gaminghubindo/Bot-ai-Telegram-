@@ -1,120 +1,267 @@
 {
-  "nama_usaha": "Warung Bu Sari",
-  "slogan": "Masakan Rumahan Khas Nusantara, Lezat & Halal",
-  "deskripsi": "Warung makan Bu Sari menyediakan berbagai macam masakan rumahan khas Nusantara yang lezat, bersih, halal, dan harga terjangkau.",
-  "alamat": "Jl. Melati No. 15, Sukajadi, Bandung",
-  "jam_buka": "08.00 - 20.00 WIB (Buka Setiap Hari)",
-  "area_antar": [
-    "Sukajadi",
-    "Pasteur",
-    "Sarijadi",
-    "Cipaganti",
-    "Setiabudi"
-  ],
-  "ongkir": {
-    "default": 8000,
-    "area_tarif": {
-      "sukajadi": 5000,
-      "pasteur": 7000,
-      "sarijadi": 7000,
-      "cipaganti": 8000,
-      "setiabudi": 10000
-    },
-    "keterangan": "Ongkir mulai dari Rp5.000 sesuai area antar. Gratis ongkir untuk pesanan minimal Rp100.000 ke area Sukajadi."
-  },
+  "nama_usaha": "Digital Store UMKM",
+  "slogan": "Pusat Langganan AI, Streaming, dan Software Premium Terpercaya",
+  "deskripsi": "Menyediakan berbagai akun premium, langganan tools AI, streaming, aplikasi desain, dan VPN dengan harga hemat, proses cepat, dan garansi penuh.",
+  "syarat_ketentuan": "⚠️ Harap mematuhi syarat dan ketentuan yang berlaku. Garansi berlaku sesuai durasi langganan. Dilarang mengubah data akun kecuali jenis Private.",
   "info_pembayaran": {
-    "metode": [
-      "Transfer Bank BCA",
-      "QRIS (Gopay, OVO, Dana, ShopeePay, Mobile Banking)",
-      "Tunai / COD (bayar saat pesanan tiba)"
-    ],
-    "rekening": "BCA: 1234567890 a/n Sari Wahyuni",
-    "catatan": "Untuk pembayaran non-tunai, mohon kirim bukti transfer ke chat ini agar pesanan langsung diproses."
+    "qris": "QRIS Dinamis / Statis (Mendukung semua E-Wallet & Mobile Banking)",
+    "bank": "Bank BCA: 1234567890 a/n Toko Digital",
+    "ewallet": "DANA / OVO / GoPay: 081234567890 a/n Toko Digital",
+    "catatan": "Kirimkan bukti transfer ke chat ini setelah melakukan pembayaran agar pesanan langsung diproses otomatis oleh admin."
   },
-  "menu": [
+  "kategori": [
     {
-      "id": "nasgor_spesial",
-      "nama": "Nasi Goreng Spesial",
-      "harga": 18000,
-      "kategori": "Makanan Utama",
-      "deskripsi": "Nasi goreng bumbu gurih dengan ayam suwir, bakso, telur ceplok, kerupuk, dan acar."
+      "id": "ai_tools",
+      "nama": "🤖 AI Tools & Assistant"
     },
     {
-      "id": "mie_goreng_jawa",
-      "nama": "Mie Goreng Jawa",
-      "harga": 17000,
-      "kategori": "Makanan Utama",
-      "deskripsi": "Mie kuning kenyal dimasak bumbu kecap manis gurih, kol, sawi, suwiran ayam, dan taburan bawang goreng."
+      "id": "streaming",
+      "nama": "🎬 Streaming & Film"
     },
     {
-      "id": "paket_ayam_geprek",
-      "nama": "Paket Nasi Ayam Geprek",
-      "harga": 24000,
-      "kategori": "Makanan Utama",
-      "deskripsi": "Ayam krispi digeprek sambal bawang pedas nampol + nasi putih hangat + lalapan timun dan kemangi."
+      "id": "design",
+      "nama": "🎨 Desain & Editing"
     },
     {
-      "id": "ayam_geprek_ala_carte",
-      "nama": "Ayam Geprek Sambal Bawang (Tanpa Nasi)",
-      "harga": 20000,
-      "kategori": "Makanan Utama",
-      "deskripsi": "Ayam krispi gurih digeprek sambal bawang segar + lalapan (tanpa nasi)."
+      "id": "vpn_security",
+      "nama": "🛡️ VPN & Keamanan"
     },
     {
-      "id": "soto_ayam_lamongan",
-      "nama": "Soto Ayam Lamongan",
-      "harga": 22000,
-      "kategori": "Makanan Utama",
-      "deskripsi": "Soto ayam kuah kuning gurih segar dengan koya renyah, soun, tauge, kol, dan suwiran ayam."
+      "id": "productivity",
+      "nama": "💼 Produktivitas & Belajar"
+    }
+  ],
+  "produk": [
+    {
+      "id": "google_gemini_pro",
+      "nama": "Google AI / Gemini Pro",
+      "kategori_id": "ai_tools",
+      "icon": "🤖",
+      "deskripsi": "Akses Google Gemini Advanced / Pro dengan fitur AI tercanggih Google, integrasi Google Workspace, dan kuota besar.",
+      "varian": [
+        {
+          "id": "gemini_1bln",
+          "nama": "Gemini Pro 1 Bulan",
+          "harga": 15000,
+          "stok": 50
+        },
+        {
+          "id": "gemini_3bln",
+          "nama": "Gemini Pro 3 Bulan",
+          "harga": 20000,
+          "stok": 113
+        },
+        {
+          "id": "gemini_6bln",
+          "nama": "Gemini Pro 6 Bulan",
+          "harga": 35000,
+          "stok": 25
+        }
+      ]
     },
     {
-      "id": "tahu_tempe_bacem",
-      "nama": "Tahu & Tempe Bacem",
-      "harga": 6000,
-      "kategori": "Lauk & Camilan",
-      "deskripsi": "1 potong tahu bacem dan 1 potong tempe bacem bumbu manis legit khas Jawa."
+      "id": "chatgpt_plus",
+      "nama": "ChatGPT Plus (GPT-4o)",
+      "kategori_id": "ai_tools",
+      "icon": "🧠",
+      "deskripsi": "Langganan resmi ChatGPT Plus dengan akses GPT-4o, DALL-E 3 image generation, analisis dokumen, dan web browsing.",
+      "varian": [
+        {
+          "id": "gpt_sharing_1bln",
+          "nama": "ChatGPT Plus Sharing 1 Bulan",
+          "harga": 35000,
+          "stok": 30
+        },
+        {
+          "id": "gpt_private_1bln",
+          "nama": "ChatGPT Plus Private 1 Bulan",
+          "harga": 275000,
+          "stok": 10
+        }
+      ]
     },
     {
-      "id": "nasi_putih",
-      "nama": "Nasi Putih",
-      "harga": 5000,
-      "kategori": "Tambahan",
-      "deskripsi": "Nasi putih pulen hangat porsi 1 orang."
+      "id": "grok_ai",
+      "nama": "Grok AI Premium",
+      "kategori_id": "ai_tools",
+      "icon": "🚀",
+      "deskripsi": "Akses AI Grok tanpa batas dengan fitur analitik cerdas dan realtime data.",
+      "varian": [
+        {
+          "id": "grok_1bln",
+          "nama": "Grok AI 1 Bulan",
+          "harga": 45000,
+          "stok": 20
+        }
+      ]
     },
     {
-      "id": "telur_tambahan",
-      "nama": "Telur Ceplok / Dadar",
-      "harga": 4000,
-      "kategori": "Tambahan",
-      "deskripsi": "Tambahan telur ayam goreng ceplok mata sapi atau dadar."
+      "id": "netflix_premium",
+      "nama": "Netflix Premium 4K UHD",
+      "kategori_id": "streaming",
+      "icon": "🍿",
+      "deskripsi": "Streaming film & serial kualitas 4K Ultra HD. Akun legal, anti on-hold, garansi penuh.",
+      "varian": [
+        {
+          "id": "netflix_1p_1bln",
+          "nama": "1 Profil 1 User 1 Bulan",
+          "harga": 28000,
+          "stok": 45
+        },
+        {
+          "id": "netflix_1p_3bln",
+          "nama": "1 Profil 1 User 3 Bulan",
+          "harga": 75000,
+          "stok": 15
+        },
+        {
+          "id": "netflix_semi_private",
+          "nama": "Semi Private 1 Bulan",
+          "harga": 45000,
+          "stok": 8
+        }
+      ]
     },
     {
-      "id": "es_teh_manis",
-      "nama": "Es Teh Manis",
-      "harga": 5000,
-      "kategori": "Minuman",
-      "deskripsi": "Teh melati seduh wangi disajikan dingin dengan gula tebu asli."
+      "id": "prime_video",
+      "nama": "Amazon Prime Video",
+      "kategori_id": "streaming",
+      "icon": "📺",
+      "deskripsi": "Nonton film dan original series Amazon Prime Video kualitas Full HD / 4K.",
+      "varian": [
+        {
+          "id": "prime_1bln",
+          "nama": "Prime Video 1 Bulan",
+          "harga": 15000,
+          "stok": 35
+        },
+        {
+          "id": "prime_3bln",
+          "nama": "Prime Video 3 Bulan",
+          "harga": 38000,
+          "stok": 18
+        }
+      ]
     },
     {
-      "id": "es_jeruk_peras",
-      "nama": "Es Jeruk Peras Segar",
-      "harga": 7000,
-      "kategori": "Minuman",
-      "deskripsi": "Jeruk peras murni segar kaya vitamin C dengan es batu."
+      "id": "canva_pro",
+      "nama": "Canva Pro Desain",
+      "kategori_id": "design",
+      "icon": "✨",
+      "deskripsi": "Desain tanpa batas! Akses ribuan template premium, hapus latar belakang, font pro, dan penyimpanan cloud 1TB.",
+      "varian": [
+        {
+          "id": "canva_1bln",
+          "nama": "Canva Pro Member 1 Bulan",
+          "harga": 10000,
+          "stok": 80
+        },
+        {
+          "id": "canva_1thn",
+          "nama": "Canva Pro Member 1 Tahun",
+          "harga": 25000,
+          "stok": 50
+        },
+        {
+          "id": "canva_lifetime",
+          "nama": "Canva Pro Member Lifetime",
+          "harga": 45000,
+          "stok": 20
+        }
+      ]
     },
     {
-      "id": "jus_alpukat",
-      "nama": "Jus Alpukat",
-      "harga": 12000,
-      "kategori": "Minuman",
-      "deskripsi": "Jus alpukat mentega kental dengan siraman susu cokelat kental manis."
+      "id": "adobe_creative_cloud",
+      "nama": "Adobe Creative Cloud",
+      "kategori_id": "design",
+      "icon": "🎨",
+      "deskripsi": "Akses semua aplikasi Adobe (Photoshop, Illustrator, Premiere Pro, After Effects) lisensi resmi email pribadi.",
+      "varian": [
+        {
+          "id": "adobe_1bln",
+          "nama": "Adobe All Apps 1 Bulan",
+          "harga": 75000,
+          "stok": 12
+        },
+        {
+          "id": "adobe_3bln",
+          "nama": "Adobe All Apps 3 Bulan",
+          "harga": 195000,
+          "stok": 5
+        }
+      ]
     },
     {
-      "id": "kerupuk_putih",
-      "nama": "Kerupuk Putih",
-      "harga": 2000,
-      "kategori": "Tambahan",
-      "deskripsi": "Kerupuk kaleng putih renyah dan gurih."
+      "id": "nordvpn_premium",
+      "nama": "NordVPN Premium",
+      "kategori_id": "vpn_security",
+      "icon": "🌐",
+      "deskripsi": "VPN tercepat dan teraman untuk browsing bebas batas, streaming luar negeri, dan enkripsi data pribadi.",
+      "varian": [
+        {
+          "id": "nord_1bln",
+          "nama": "NordVPN 1 Bulan",
+          "harga": 18000,
+          "stok": 25
+        },
+        {
+          "id": "nord_1thn",
+          "nama": "NordVPN 1 Tahun",
+          "harga": 65000,
+          "stok": 15
+        }
+      ]
+    },
+    {
+      "id": "surfshark_vpn",
+      "nama": "Surfshark VPN",
+      "kategori_id": "vpn_security",
+      "icon": "🦈",
+      "deskripsi": "VPN stabil dengan fitur CleanWeb (anti iklan) dan perlindungan malware.",
+      "varian": [
+        {
+          "id": "surf_1bln",
+          "nama": "Surfshark VPN 1 Bulan",
+          "harga": 16000,
+          "stok": 20
+        }
+      ]
+    },
+    {
+      "id": "duolingo_super",
+      "nama": "Duolingo Super",
+      "kategori_id": "productivity",
+      "icon": "🦉",
+      "deskripsi": "Belajar bahasa asing tanpa iklan, nyawa tak terbatas, dan review latihan khusus.",
+      "varian": [
+        {
+          "id": "duo_1bln",
+          "nama": "Duolingo Super 1 Bulan",
+          "harga": 15000,
+          "stok": 30
+        },
+        {
+          "id": "duo_1thn",
+          "nama": "Duolingo Super 1 Tahun",
+          "harga": 45000,
+          "stok": 15
+        }
+      ]
+    },
+    {
+      "id": "microsoft_365",
+      "nama": "Microsoft 365 + 1TB Cloud",
+      "kategori_id": "productivity",
+      "icon": "📁",
+      "deskripsi": "Aplikasi Word, Excel, PowerPoint original untuk 5 perangkat + penyimpanan cloud OneDrive 1TB.",
+      "varian": [
+        {
+          "id": "ms365_1thn",
+          "nama": "Microsoft 365 1 Tahun",
+          "harga": 55000,
+          "stok": 22
+        }
+      ]
     }
   ]
 }

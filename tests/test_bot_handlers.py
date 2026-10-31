@@ -1,6 +1,6 @@
 """
 tests/test_bot_handlers.py - Pengujian integrasi handler Telegram:
-/start, /menu, /id, alur percakapan, konfirmasi pesanan, dan komplain.
+/start, /menu, /id, callback button clicks, photo upload bukti transfer, dan chat AI.
 """
 
 import asyncio
@@ -23,43 +23,48 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         orders.clear_pending_order(112233)
 
     async def test_start_command(self):
+        """Uji /start menampilkan dashboard akun & tombol interaktif."""
         update = MagicMock()
         update.effective_chat.id = 112233
-        update.effective_user.first_name = "Budi"
+        update.effective_user.first_name = "Lnel"
+        update.effective_user.username = "lnel_user"
+        update.effective_user.full_name = "Lnel"
 
         context = MagicMock()
         context.bot.send_message = AsyncMock()
 
         await main.start_command(update, context)
 
-        # Verifikasi pesan selamat datang dikirim
         context.bot.send_message.assert_called_once()
         sent_text = context.bot.send_message.call_args.kwargs["text"]
-        self.assertIn("Halo Budi!", sent_text)
-        self.assertIn("Warung Bu Sari", sent_text)
-        self.assertIn("/menu", sent_text)
+        markup = context.bot.send_message.call_args.kwargs["reply_markup"]
+
+        self.assertIn("ACCOUNT", sent_text)
+        self.assertIn("112233", sent_text)
+        self.assertIsNotNone(markup)
 
     async def test_menu_command(self):
+        """Uji /menu menampilkan dashboard akun."""
         update = MagicMock()
         update.effective_chat.id = 112233
+        update.effective_user.username = "lnel_user"
+        update.effective_user.full_name = "Lnel"
 
         context = MagicMock()
-        context.bot.send_chat_action = AsyncMock()
         context.bot.send_message = AsyncMock()
 
         await main.menu_command(update, context)
 
-        context.bot.send_chat_action.assert_called_once()
         context.bot.send_message.assert_called_once()
         sent_text = context.bot.send_message.call_args.kwargs["text"]
-        self.assertIn("DAFTAR MENU WARUNG BU SARI", sent_text)
-        self.assertIn("Rp18.000", sent_text)
+        self.assertIn("ACCOUNT", sent_text)
 
     async def test_id_command(self):
+        """Uji /id menampilkan informasi chat ID pengguna."""
         update = MagicMock()
         update.effective_chat.id = 112233
-        update.effective_user.username = "budisantoso"
-        update.effective_user.full_name = "Budi Santoso"
+        update.effective_user.username = "lnel_user"
+        update.effective_user.full_name = "Lnel"
 
         context = MagicMock()
         context.bot.send_message = AsyncMock()
@@ -68,112 +73,93 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
 
         sent_text = context.bot.send_message.call_args.kwargs["text"]
         self.assertIn("112233", sent_text)
-        self.assertIn("Budi Santoso", sent_text)
-        self.assertIn("@budisantoso", sent_text)
+        self.assertIn("Lnel", sent_text)
 
-    async def test_order_flow_to_confirmation(self):
-        """Simulasi alur order dari rekomendasi LLM hingga konfirmasi 'ya' pelanggan."""
+    async def test_callback_navigation_flow(self):
+        """Uji alur navigasi tombol callback: view_catalog -> prod -> var -> qty -> pay."""
+        chat_id = 112233
+        user = MagicMock(username="lnel_user", full_name="Lnel")
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        # 1. Klik view_catalog
+        update1 = MagicMock()
+        update1.effective_chat.id = chat_id
+        update1.effective_user = user
+        update1.callback_query.data = "view_catalog"
+        update1.callback_query.answer = AsyncMock()
+        update1.callback_query.edit_message_text = AsyncMock()
+
+        await main.handle_callback_query(update1, context)
+        update1.callback_query.edit_message_text.assert_called_once()
+        cat_text = update1.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("PRODUK TERSEDIA", cat_text)
+
+        # 2. Klik prod:google_gemini_pro
+        update2 = MagicMock()
+        update2.effective_chat.id = chat_id
+        update2.effective_user = user
+        update2.callback_query.data = "prod:google_gemini_pro"
+        update2.callback_query.answer = AsyncMock()
+        update2.callback_query.edit_message_text = AsyncMock()
+
+        await main.handle_callback_query(update2, context)
+        update2.callback_query.edit_message_text.assert_called_once()
+        prod_text = update2.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("PILIHAN VARIAN", prod_text)
+
+        # 3. Klik pay:google_gemini_pro:gemini_3bln:1:bca
+        update3 = MagicMock()
+        update3.effective_chat.id = chat_id
+        update3.effective_user = user
+        update3.callback_query.data = "pay:google_gemini_pro:gemini_3bln:1:bca"
+        update3.callback_query.answer = AsyncMock()
+        update3.callback_query.edit_message_text = AsyncMock()
+
+        with patch.object(main, "OWNER_CHAT_ID", "999888"):
+            await main.handle_callback_query(update3, context)
+
+        # Pesan instruksi bayar dikirim ke user
+        pay_text = update3.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("PESANAN BERHASIL DIBUAT", pay_text)
+        self.assertIn("BCA", pay_text)
+
+        # Notifikasi pesanan dikirim ke owner
+        context.bot.send_message.assert_called_once()
+        owner_call = context.bot.send_message.call_args.kwargs
+        self.assertEqual(owner_call["chat_id"], "999888")
+        self.assertIn("PESANAN BARU MASUK!", owner_call["text"])
+
+    async def test_photo_proof_upload(self):
+        """Uji pengiriman foto bukti pembayaran oleh pelanggan."""
         chat_id = 112233
         update = MagicMock()
         update.effective_chat.id = chat_id
-        update.effective_user.username = "budisantoso"
-        update.effective_user.full_name = "Budi Santoso"
-        update.message.text = "ya"
-
-        # Simulasikan ada pesanan yang sedang menunggu konfirmasi
-        pending_order = {
-            "nama": "Budi Santoso",
-            "metode": "Antar (Delivery)",
-            "alamat": "Jl. Sukajadi No. 10",
-            "area_antar": "Sukajadi",
-            "waktu": "13.00 WIB",
-            "catatan": "Pedas manis",
-            "items": [
-                {
-                    "nama": "Nasi Goreng Spesial",
-                    "qty": 1,
-                    "harga_satuan": 18000,
-                    "subtotal": 18000,
-                    "catatan": "-"
-                }
-            ],
-            "subtotal": 18000,
-            "ongkir": 5000,
-            "total_harga": 23000
-        }
-        orders.set_pending_order(chat_id, pending_order)
+        update.effective_user.username = "lnel_user"
+        update.effective_user.full_name = "Lnel"
+        photo_obj = MagicMock(file_id="photo_123_abc")
+        update.message.photo = [photo_obj]
 
         context = MagicMock()
-        context.bot.send_chat_action = AsyncMock()
+        context.bot.send_photo = AsyncMock()
         context.bot.send_message = AsyncMock()
 
         with patch.object(main, "OWNER_CHAT_ID", "999888"):
-            await main.handle_message(update, context)
+            await main.handle_photo(update, context)
 
-        # Pastikan 2 pesan terkirim: 1 ke pemilik (rekap) dan 1 ke pelanggan (konfirmasi)
-        self.assertEqual(context.bot.send_message.call_count, 2)
+        # Pastikan foto diteruskan ke owner
+        context.bot.send_photo.assert_called_once()
+        owner_photo_call = context.bot.send_photo.call_args.kwargs
+        self.assertEqual(owner_photo_call["chat_id"], "999888")
+        self.assertEqual(owner_photo_call["photo"], "photo_123_abc")
+        self.assertIn("BUKTI PEMBAYARAN BARU DITERIMA!", owner_photo_call["caption"])
 
-        # Cek rekap pemilik
-        owner_call = [
-            c for c in context.bot.send_message.call_args_list
-            if c.kwargs.get("chat_id") == "999888"
-        ][0]
-        self.assertIn("PESANAN BARU MASUK!", owner_call.kwargs["text"])
-        self.assertIn("Rp23.000", owner_call.kwargs["text"])
-
-        # Cek pesan sukses ke pelanggan
-        cust_call = [
-            c for c in context.bot.send_message.call_args_list
-            if c.kwargs.get("chat_id") == chat_id
-        ][0]
-        self.assertIn("pesanan kakak sudah kami terima dan dicatat!", cust_call.kwargs["text"])
-
-        # Pastikan state pending order sudah di-clear
-        self.assertIsNone(orders.get_pending_order(chat_id))
-
-    async def test_complaint_escalation(self):
-        """Simulasi pesan komplain dari pelanggan yang diteruskan ke pemilik."""
-        chat_id = 112233
-        update = MagicMock()
-        update.effective_chat.id = chat_id
-        update.effective_user.username = "budisantoso"
-        update.effective_user.full_name = "Budi Santoso"
-        update.message.text = "Min, makanannya basi nih tolong ganti dong!"
-
-        context = MagicMock()
-        context.bot.send_chat_action = AsyncMock()
-        context.bot.send_message = AsyncMock()
-
-        mock_llm_reply = (
-            "Duh, maaf banget ya kak atas ketidaknyamanannya! 🙏 "
-            "Hal ini langsung aku infokan ke pemilik warung ya kak.\n\n"
-            "```json:escalate\n"
-            "{\n"
-            '  "alasan": "Komplain makanan basi dan minta ganti"\n'
-            "}\n"
-            "```"
-        )
-
-        with patch.object(main, "OWNER_CHAT_ID", "999888"), \
-             patch("main.call_llm", AsyncMock(return_value=(mock_llm_reply, "gemini"))):
-            await main.handle_message(update, context)
-
-        # Harus ada notifikasi eskalasi ke OWNER_CHAT_ID
-        owner_call = [
-            c for c in context.bot.send_message.call_args_list
-            if c.kwargs.get("chat_id") == "999888"
-        ][0]
-        self.assertIn("NOTIFIKASI CS / KOMPLAIN PELANGGAN", owner_call.kwargs["text"])
-        self.assertIn("Budi Santoso", owner_call.kwargs["text"])
-        self.assertIn("makanannya basi nih", owner_call.kwargs["text"])
-
-        # Dan pesan yang dikirim ke pelanggan bersih dari tag JSON
-        cust_call = [
-            c for c in context.bot.send_message.call_args_list
-            if c.kwargs.get("chat_id") == chat_id
-        ][0]
-        self.assertNotIn("json:escalate", cust_call.kwargs["text"])
-        self.assertIn("maaf banget ya kak", cust_call.kwargs["text"])
+        # Dan pesan konfirmasi dikirim ke pelanggan
+        context.bot.send_message.assert_called_once()
+        cust_call = context.bot.send_message.call_args.kwargs
+        self.assertEqual(cust_call["chat_id"], chat_id)
+        self.assertIn("Foto bukti pembayaran sudah kami terima", cust_call["text"])
 
 
 if __name__ == "__main__":
