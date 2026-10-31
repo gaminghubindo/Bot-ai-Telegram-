@@ -6,6 +6,16 @@ Menggunakan python-telegram-bot (async) dengan integrasi LLM dan manajemen pesan
 import logging
 import os
 import re
+import sys
+
+# Dukungan UTF-8 di Windows Console
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 from dotenv import load_dotenv
 from telegram import Update, constants
 from telegram.ext import (
