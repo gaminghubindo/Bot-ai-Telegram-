@@ -383,7 +383,7 @@ def build_freelance_preview_keyboard(user_id: int | str, owner_id: str = "") -> 
 
     keyboard = [
         [
-            InlineKeyboardButton(f"📱 Bayar {fee_str} via QRIS (Buka Info)", callback_data="fl_pay:qris")
+            InlineKeyboardButton(f"📱 Bayar {fee_str} via QR Code GoPay / QRIS", callback_data="fl_pay:qris")
         ],
         [
             InlineKeyboardButton("🏦 Transfer Bank BCA", callback_data="fl_pay:bca"),
@@ -462,11 +462,11 @@ def build_freelance_payment_instruction(method_code: str, chat_id: int | str, us
     order_id = f"ORD-FL-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     total_str = "Rp5.000"
 
-    if method_code == "qris":
-        nama_metode = "QRIS Dinamis"
+    if method_code in ["qris", "gopay"]:
+        nama_metode = "QR Code GoPay / QRIS"
         detail_rekening = (
-            "📱 *Metode:* QRIS (Semua E-Wallet & Bank)\n"
-            "Silakan transfer tepat *Rp5.000* ke QRIS toko kami atau gunakan E-Wallet di bawah."
+            "📱 *Metode:* QR Code GoPay / QRIS\n"
+            "Silakan scan foto *QR Code GoPay* di atas menggunakan GoPay/Gojek, BCA, DANA, OVO, atau ShopeePay."
         )
     elif method_code == "bca":
         nama_metode = "Bank BCA"

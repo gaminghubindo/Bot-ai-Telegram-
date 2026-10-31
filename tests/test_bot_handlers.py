@@ -340,15 +340,20 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         update_pay.effective_user = user
         update_pay.callback_query.data = "fl_pay:qris"
         update_pay.callback_query.answer = AsyncMock()
+        update_pay.callback_query.message.delete = AsyncMock()
         update_pay.callback_query.edit_message_text = AsyncMock()
+        context.bot.send_photo = AsyncMock()
 
         with patch.object(main, "OWNER_CHAT_ID", "5803366133"):
             await main.handle_callback_query(update_pay, context)
 
-        update_pay.callback_query.edit_message_text.assert_called_once()
-        pay_text = update_pay.callback_query.edit_message_text.call_args.kwargs["text"]
-        self.assertIn("PEMESANAN AKSES INFO FREELANCE", pay_text)
-        self.assertIn("Rp5.000", pay_text)
+        # Foto QR Code GoPay berhasil dikirim ke pelanggan
+        context.bot.send_photo.assert_called_once()
+        call_kwargs = context.bot.send_photo.call_args.kwargs
+        self.assertEqual(call_kwargs["chat_id"], chat_id)
+        self.assertIn("PEMESANAN AKSES INFO FREELANCE", call_kwargs["caption"])
+        self.assertIn("Rp5.000", call_kwargs["caption"])
+        self.assertIn("GoPay", call_kwargs["caption"])
 
         # 3. Owner buka akses lewat /unlock 112233
         owner_update = MagicMock()

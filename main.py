@@ -66,6 +66,37 @@ async def send_safe_message(context: ContextTypes.DEFAULT_TYPE, chat_id: int | s
         )
 
 
+async def send_safe_photo(context: ContextTypes.DEFAULT_TYPE, chat_id: int | str, photo_path: str, caption: str, reply_markup=None) -> None:
+    """Mengirim foto QR Code secara aman dengan caption Markdown."""
+    if os.path.exists(photo_path):
+        try:
+            with open(photo_path, "rb") as pf:
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=pf,
+                    caption=caption,
+                    parse_mode=constants.ParseMode.MARKDOWN,
+                    reply_markup=reply_markup
+                )
+                return
+        except Exception as e:
+            logger.warning(f"Gagal kirim foto dengan Markdown ({e}), mencoba teks biasa...")
+            try:
+                with open(photo_path, "rb") as pf:
+                    await context.bot.send_photo(
+                        chat_id=chat_id,
+                        photo=pf,
+                        caption=caption,
+                        parse_mode=None,
+                        reply_markup=reply_markup
+                    )
+                    return
+            except Exception as e2:
+                logger.error(f"Gagal total kirim foto ({e2}), fallback kirim teks biasa.")
+
+    await send_safe_message(context, chat_id, caption, reply_markup=reply_markup)
+
+
 async def edit_safe_message(query, text: str, reply_markup=None) -> None:
     """Mengedit pesan callback secara aman."""
     try:
@@ -500,9 +531,18 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     # 0c. Pilih Metode Bayar Akses Freelance (Rp5.000)
     if data.startswith("fl_pay:"):
         method_code = data.split(":")[1]
-        await query.answer("💳 Menyiapkan pembayaran tiket freelance... ✨")
+        await query.answer("💳 Menyiapkan QR Code GoPay & tiket freelance... ✨")
         text, markup, owner_msg = orders.build_freelance_payment_instruction(method_code, chat_id, user_info)
-        await edit_safe_message(query, text, markup)
+
+        qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "qris_gopay.jpg")
+        if method_code in ["qris", "gopay"] and os.path.exists(qr_path):
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+            await send_safe_photo(context, chat_id, qr_path, text, reply_markup=markup)
+        else:
+            await edit_safe_message(query, text, markup)
 
         # Teruskan notifikasi ke owner
         if OWNER_CHAT_ID and OWNER_CHAT_ID != "your_chat_id_here":
@@ -630,7 +670,16 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         text, markup, owner_msg = orders.build_payment_instruction(
             prod_id, var_id, qty, method_code, chat_id, user_info
         )
-        await edit_safe_message(query, text, markup)
+
+        qr_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "qris_gopay.jpg")
+        if method_code == "qris" and os.path.exists(qr_path):
+            try:
+                await query.message.delete()
+            except Exception:
+                pass
+            await send_safe_photo(context, chat_id, qr_path, text, reply_markup=markup)
+        else:
+            await edit_safe_message(query, text, markup)
 
         # Kirim notifikasi pesanan ke pemilik toko
         if OWNER_CHAT_ID and OWNER_CHAT_ID != "your_chat_id_here":
@@ -855,6 +904,18 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "full_name": user.full_name if user else "Pelanggan"
     }
 
+    # Cek jika pemilik mengunggah QR Code baru (/setqris /setgopay)
+    if OWNER_CHAT_ID and str(chat_id) == str(OWNER_CHAT_ID) and update.message.caption:
+        cap_lower = update.message.caption.lower()
+        if any(cmd in cap_lower for cmd in ["/setqris", "/setgopay", "set qris", "set gopay", "#qris"]):
+            qr_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+            os.makedirs(qr_dir, exist_ok=True)
+            qr_dest = os.path.join(qr_dir, "qris_gopay.jpg")
+            photo_file = await update.message.photo[-1].get_file()
+            await photo_file.download_to_drive(qr_dest)
+            await send_safe_message(context, chat_id, "✅ *QR Code GoPay Berhasil Disimpan!* 🎉\n\nFoto QR Code GoPay ini sekarang otomatis akan ditampilkan saat pelanggan membayar Info Freelance dan produk via QRIS!")
+            return
+
     # Teruskan foto bukti pembayaran ke pemilik toko
     if OWNER_CHAT_ID and OWNER_CHAT_ID != "your_chat_id_here":
         try:
@@ -901,13 +962,14 @@ async def post_init(application: Application) -> None:
         # Atur deskripsi bot di Telegram (Muncul saat chat pertama kali dibuka, maks 512 karakter)
         desc = (
             "Selamat datang di Elva Tech — Toko Digital & Jasa Kreatif UMKM!\n\n"
-            "💎 Produk Digital: Akun AI (Gemini Pro, ChatGPT), Canva, Netflix, dll.\n"
-            "🛠️ Layanan Jasa: Landing Page (Rp45rb), Desain PPT (Rp2rb/slide), 3D Modeling (Rp90rb).\n"
-            "📢 Elva Group: Update restock & reset stok akun.\n"
+            "💎 Produk Digital: Akun AI, Canva, Netflix, dll.\n"
+            "🛠️ Layanan Jasa: Landing Page (Rp45rb), Desain PPT (Rp2rb), 3D Modeling (Rp90rb).\n"
+            "💼 Info Freelance: Akses kontak klien & proyek cuan.\n"
+            "📢 Elva Group: Update restock & info slot.\n"
             "🌐 Website Resmi: https://lynk.id/nellionel\n"
-            "💬 Konsultasi & Bantuan: Hubungi Telegram @Carlendra"
+            "💬 Konsultasi & CS: Hubungi Telegram @Carlendra"
         )
-        short_desc = "Elva Tech: Jasa Kreatif, Akun Digital & Info Restock Elva Group. CS: @Carlendra"
+        short_desc = "Elva Tech: Jasa Kreatif & Akun Digital. Web: https://lynk.id/nellionel | CS: @Carlendra"
         try:
             await application.bot.set_my_description(desc)
             await application.bot.set_my_short_description(short_desc)
