@@ -1,0 +1,37 @@
+{
+  "biaya_akses": 5000,
+  "biaya_format": "Rp5.000",
+  "keterangan": "Akses eksklusif kontak klien langsung, brief proyek lengkap, dan panduan apply lowongan freelance aktif.",
+  "daftar_job": [
+    {
+      "id": "fl_01",
+      "judul": "Pembuatan Landing Page Bisnis Kuliner",
+      "kategori": "Web Development",
+      "budget": "Rp350.000 - Rp500.000",
+      "deadline": "3 Hari Kerja",
+      "status": "aktif",
+      "teaser": "Dibutuhkan freelance web builder untuk membuat 1 halaman landing page promosi menu restoran dengan alur pesanan ke WhatsApp.",
+      "detail_rahasia": "👤 Klien: Bpk. Hendra (Resto Sari Laut)\n📱 Kontak WhatsApp: 0812-9876-5432\n✈️ Telegram: @resto_sarilaut\n📝 Brief Lengkap: Landing page 1 halaman responsive HP dengan foto menu & tombol order WA. Aset foto makanan sudah disiapkan oleh klien."
+    },
+    {
+      "id": "fl_02",
+      "judul": "Desain 20 Slide Presentasi Pitch Deck UMKM",
+      "kategori": "Desain Grafis / PPT",
+      "budget": "Rp150.000 - Rp200.000",
+      "deadline": "2 Hari Kerja",
+      "status": "aktif",
+      "teaser": "Dibutuhkan desainer presentasi Canva / PowerPoint untuk merapikan materi pitch deck bisnis produk kecantikan agar tampil elegan di depan investor.",
+      "detail_rahasia": "👤 Klien: Kak Vina (GlowSkin UMKM)\n📱 Kontak WhatsApp: 0857-1122-3344\n✈️ Telegram: @glowskin_admin\n📝 Brief Lengkap: Merapikan slide teks draft menjadi desain visual minimalis modern. Warna brand: Pastel pink & gold."
+    },
+    {
+      "id": "fl_03",
+      "judul": "3D Mockup Botol Serum Kosmetik",
+      "kategori": "3D Modeling",
+      "budget": "Rp200.000 - Rp300.000",
+      "deadline": "4 Hari Kerja",
+      "status": "aktif",
+      "teaser": "Pembuatan 2 visual render 3D botol serum untuk display etalase Shopee & Tokopedia.",
+      "detail_rahasia": "👤 Klien: CV Natura Beauty\n📱 Kontak WhatsApp: 0813-5566-7788\n✈️ Telegram: @naturabeauty_id\n📝 Brief Lengkap: 3D render botol serum kaca 30ml beserta label stiker. Format output PNG transparan & JPEG 2000x2000px."
+    }
+  ]
+}

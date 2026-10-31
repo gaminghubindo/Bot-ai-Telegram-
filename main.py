@@ -235,6 +235,106 @@ async def grup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
 
 
+async def freelance_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /freelance: Menampilkan preview lowongan freelance atau detail bagi yang sudah unlock."""
+    if update.message:
+        await safe_react(update.message, "💼")
+
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+
+    user_info = {
+        "chat_id": chat_id,
+        "username": user.username if user else "",
+        "full_name": user.full_name if user else "Pelanggan"
+    }
+
+    # Gerbang Verifikasi: Wajib Gabung Elva Group
+    verified = await is_user_verified(context, chat_id)
+    if not verified:
+        text, reply_markup = orders.build_gatekeeper_keyboard(user_info)
+        await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+        return
+
+    text, reply_markup = orders.build_freelance_preview_keyboard(chat_id, OWNER_CHAT_ID)
+    await send_safe_message(context, chat_id, text, reply_markup=reply_markup)
+
+
+async def unlock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /unlock atau /bukaakses (Khusus Owner): Membuka akses info freelance untuk user tertentu."""
+    user = update.effective_user
+    chat_id = str(update.effective_chat.id)
+
+    # Validasi hanya pemilik toko
+    if OWNER_CHAT_ID and chat_id != str(OWNER_CHAT_ID):
+        await send_safe_message(context, chat_id, "⚠️ Perintah ini khusus untuk pemilik toko.")
+        return
+
+    args = context.args
+    if not args:
+        await send_safe_message(context, chat_id, "⚠️ Format salah. Gunakan: `/unlock <chat_id_pelanggan>`")
+        return
+
+    target_id = args[0].strip()
+    orders.unlock_freelance_user(target_id)
+
+    # Beri tahu owner
+    await send_safe_message(context, chat_id, f"✅ Sukses! Akses Info Freelancer untuk Chat ID `{target_id}` telah dibuka. 🚀")
+
+    # Kirim notifikasi ucapan selamat ke pelanggan
+    try:
+        notif_user = (
+            "🎉 *SELAMAT! AKSES INFO FREELANCER TELAH AKTIF!* 🔓\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Pembayaran tiket Rp5.000 Anda telah diverifikasi oleh admin Elva Tech.\n\n"
+            "Sekarang Anda sudah bisa melihat kontak langsung klien, brief proyek, dan panduan apply!\n\n"
+            "👉 Ketik /freelance sekarang untuk melihat lowongan lengkap! 🚀"
+        )
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton("💼 Buka Info Freelance Sekarang", callback_data="freelance_preview")]])
+        await send_safe_message(context, target_id, notif_user, reply_markup=markup)
+    except Exception as e:
+        logger.warning(f"Gagal kirim notif unlock ke user {target_id}: {e}")
+
+
+async def freelance_status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler /freelance_status (Khusus Owner): Mengatur ketersediaan job (kosong/aktif)."""
+    chat_id = str(update.effective_chat.id)
+    if OWNER_CHAT_ID and chat_id != str(OWNER_CHAT_ID):
+        await send_safe_message(context, chat_id, "⚠️ Perintah ini khusus untuk pemilik toko.")
+        return
+
+    args = context.args
+    data = orders.load_freelance_data()
+    jobs = data.get("daftar_job", [])
+
+    if not args:
+        active_count = len([j for j in jobs if j.get("status") == "aktif"])
+        msg = (
+            f"💼 *STATUS JOB FREELANCE SAAT INI*\n"
+            f"• Total Job Terdaftar: {len(jobs)}\n"
+            f"• Job Status Aktif: {active_count}\n\n"
+            f"Gunakan:\n"
+            f"`/freelance_status kosong` $\rightarrow$ Set semua job non-aktif (uji anti-tergocek)\n"
+            f"`/freelance_status aktif` $\rightarrow$ Set semua job aktif"
+        )
+        await send_safe_message(context, chat_id, msg)
+        return
+
+    mode = args[0].lower().strip()
+    if mode in ["kosong", "habis", "off"]:
+        for j in jobs:
+            j["status"] = "non-aktif"
+        orders.save_freelance_data(data)
+        await send_safe_message(context, chat_id, "🔴 Semua lowongan freelance diubah menjadi KOSONG. Calon pembeli tidak akan bisa bayar (anti-tergocek aktif).")
+    elif mode in ["aktif", "ada", "on"]:
+        for j in jobs:
+            j["status"] = "aktif"
+        orders.save_freelance_data(data)
+        await send_safe_message(context, chat_id, f"🟢 Semua lowongan freelance diubah menjadi AKTIF ({len(jobs)} job siap diambil).")
+    else:
+        await send_safe_message(context, chat_id, "Gunakan `/freelance_status kosong` atau `/freelance_status aktif`.")
+
+
 async def restock_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler /restock (Khusus Owner): Mengirim notifikasi reset/restock stok ke Elva Group."""
     chat_id = str(update.effective_chat.id)
@@ -388,6 +488,28 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer("🔒 Akses terkunci! Silakan bergabung ke Elva Group terlebih dahulu ya kak 🙏", show_alert=True)
         text, markup = orders.build_gatekeeper_keyboard(user_info)
         await edit_safe_message(query, text, markup)
+        return
+
+    # 0b. Buka Preview Info Freelance
+    if data == "freelance_preview":
+        await query.answer("💼 Membuka status lowongan freelance... ✨")
+        text, markup = orders.build_freelance_preview_keyboard(chat_id, OWNER_CHAT_ID)
+        await edit_safe_message(query, text, markup)
+        return
+
+    # 0c. Pilih Metode Bayar Akses Freelance (Rp5.000)
+    if data.startswith("fl_pay:"):
+        method_code = data.split(":")[1]
+        await query.answer("💳 Menyiapkan pembayaran tiket freelance... ✨")
+        text, markup, owner_msg = orders.build_freelance_payment_instruction(method_code, chat_id, user_info)
+        await edit_safe_message(query, text, markup)
+
+        # Teruskan notifikasi ke owner
+        if OWNER_CHAT_ID and OWNER_CHAT_ID != "your_chat_id_here":
+            try:
+                await send_safe_message(context, OWNER_CHAT_ID, owner_msg)
+            except Exception as e:
+                logger.error(f"Gagal mengirim order freelance ke owner: {e}")
         return
 
     # 1. Kembali ke Menu Dashboard Utama
@@ -766,6 +888,7 @@ async def post_init(application: Application) -> None:
     """Mendaftarkan tombol menu native [ ☰ Menu ] di samping kiri kolom chat Telegram dan deskripsi bot."""
     commands = [
         BotCommand("menu", "💎 Buka Menu & Katalog Produk"),
+        BotCommand("freelance", "💼 Info Job Freelance (Rp5k)"),
         BotCommand("jasa", "🛠️ Layanan Jasa (Landing Page, Desain, 3D)"),
         BotCommand("grup", "📢 Gabung Elva Group (Info Restock)"),
         BotCommand("start", "🚀 Mulai / Dashboard Akun"),
@@ -814,6 +937,13 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("jasa", jasa_command))
+    application.add_handler(CommandHandler("freelance", freelance_command))
+    application.add_handler(CommandHandler("freelancer", freelance_command))
+    application.add_handler(CommandHandler("info_freelance", freelance_command))
+    application.add_handler(CommandHandler("informasi_freelancer", freelance_command))
+    application.add_handler(CommandHandler("unlock", unlock_command))
+    application.add_handler(CommandHandler("bukaakses", unlock_command))
+    application.add_handler(CommandHandler("freelance_status", freelance_status_command))
     application.add_handler(CommandHandler("grup", grup_command))
     application.add_handler(CommandHandler("group", grup_command))
     application.add_handler(CommandHandler("restock", restock_command))

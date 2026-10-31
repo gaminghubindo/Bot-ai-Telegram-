@@ -6,6 +6,7 @@
 # Data pesanan pelanggan & verifikasi pengguna
 data/orders.csv
 data/verified_users.json
+data/freelance_unlocked.json
 *.csv
 
 # Scratch directory

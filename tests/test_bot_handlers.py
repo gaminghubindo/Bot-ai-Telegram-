@@ -308,5 +308,90 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         # 3. Sekarang user sudah terverifikasi
         self.assertTrue(orders.load_verified_users().__contains__(str(unverified_id)))
 
+    async def test_freelance_preview_and_anti_tergocek(self):
+        """Uji fitur /freelance: preview job aktif, jaminan anti-tergocek jika kosong, dan alur bayar Rp5.000."""
+        chat_id = 112233
+        orders.clear_unlocked_freelance_users()
+        user = MagicMock(username="freelancer_pro", full_name="Freelancer Pro")
+        update = MagicMock()
+        update.effective_chat.id = chat_id
+        update.effective_user = user
+        update.message.set_reaction = AsyncMock()
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        # 1. Buka /freelance saat ada job aktif -> Tampilkan teaser & tombol bayar Rp5.000
+        await main.freelance_command(update, context)
+        context.bot.send_message.assert_called_once()
+        sent_text = context.bot.send_message.call_args.kwargs["text"]
+        markup = context.bot.send_message.call_args.kwargs["reply_markup"]
+
+        self.assertIn("INFORMASI LOWONGAN FREELANCE", sent_text)
+        self.assertIn("TERSEDIA", sent_text)
+        self.assertIn("Rp5.000", sent_text)
+
+        btn_texts = [btn.text for row in markup.inline_keyboard for btn in row]
+        self.assertTrue(any("QRIS" in b for b in btn_texts))
+
+        # 2. Klik Bayar Rp5.000 via QRIS (fl_pay:qris)
+        update_pay = MagicMock()
+        update_pay.effective_chat.id = chat_id
+        update_pay.effective_user = user
+        update_pay.callback_query.data = "fl_pay:qris"
+        update_pay.callback_query.answer = AsyncMock()
+        update_pay.callback_query.edit_message_text = AsyncMock()
+
+        with patch.object(main, "OWNER_CHAT_ID", "5803366133"):
+            await main.handle_callback_query(update_pay, context)
+
+        update_pay.callback_query.edit_message_text.assert_called_once()
+        pay_text = update_pay.callback_query.edit_message_text.call_args.kwargs["text"]
+        self.assertIn("PEMESANAN AKSES INFO FREELANCE", pay_text)
+        self.assertIn("Rp5.000", pay_text)
+
+        # 3. Owner buka akses lewat /unlock 112233
+        owner_update = MagicMock()
+        owner_update.effective_chat.id = "5803366133"
+        context_owner = MagicMock()
+        context_owner.args = ["112233"]
+        context_owner.bot.send_message = AsyncMock()
+
+        with patch.object(main, "OWNER_CHAT_ID", "5803366133"):
+            await main.unlock_command(owner_update, context_owner)
+
+        self.assertTrue(orders.is_freelance_unlocked(chat_id))
+
+        # 4. User buka lagi /freelance -> Sekarang sudah TERBUKA lengkap dengan kontak klien
+        context.bot.send_message.reset_mock()
+        await main.freelance_command(update, context)
+        context.bot.send_message.assert_called_once()
+        unlocked_text = context.bot.send_message.call_args.kwargs["text"]
+        self.assertIn("AKSES LENGKAP INFO FREELANCER (VIP)", unlocked_text)
+        self.assertIn("WhatsApp", unlocked_text)
+
+        # 5. Uji Jaminan Anti-Tergocek: Jika status job kosong, tombol bayar non-aktif
+        orders.clear_unlocked_freelance_users()
+        fl_data = orders.load_freelance_data()
+        for j in fl_data.get("daftar_job", []):
+            j["status"] = "non-aktif"
+        orders.save_freelance_data(fl_data)
+
+        context.bot.send_message.reset_mock()
+        await main.freelance_command(update, context)
+        empty_text = context.bot.send_message.call_args.kwargs["text"]
+        empty_markup = context.bot.send_message.call_args.kwargs["reply_markup"]
+
+        self.assertIn("SEDANG KOSONG", empty_text)
+        self.assertIn("Anti-Tergocek", empty_text)
+
+        empty_btn_texts = [btn.text for row in empty_markup.inline_keyboard for btn in row]
+        self.assertFalse(any("Bayar" in b for b in empty_btn_texts))
+
+        # Kembalikan job ke aktif
+        for j in fl_data.get("daftar_job", []):
+            j["status"] = "aktif"
+        orders.save_freelance_data(fl_data)
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,76 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MENU_FILE = os.path.join(BASE_DIR, "data", "menu.json")
 ORDERS_CSV = os.path.join(BASE_DIR, "data", "orders.csv")
 VERIFIED_USERS_FILE = os.path.join(BASE_DIR, "data", "verified_users.json")
+FREELANCE_FILE = os.path.join(BASE_DIR, "data", "freelance.json")
+FREELANCE_UNLOCKED_FILE = os.path.join(BASE_DIR, "data", "freelance_unlocked.json")
+
+
+def load_freelance_data() -> dict:
+    """Membaca data info lowongan freelance dari data/freelance.json."""
+    if not os.path.exists(FREELANCE_FILE):
+        return {"biaya_akses": 5000, "biaya_format": "Rp5.000", "daftar_job": []}
+    try:
+        with open(FREELANCE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"biaya_akses": 5000, "biaya_format": "Rp5.000", "daftar_job": []}
+
+
+def save_freelance_data(data: dict) -> None:
+    """Menyimpan data lowongan freelance ke data/freelance.json."""
+    try:
+        os.makedirs(os.path.dirname(FREELANCE_FILE), exist_ok=True)
+        with open(FREELANCE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def load_unlocked_freelance_users() -> set:
+    """Membaca daftar ID pengguna yang sudah membayar & membuka akses info freelance."""
+    if not os.path.exists(FREELANCE_UNLOCKED_FILE):
+        return set()
+    try:
+        with open(FREELANCE_UNLOCKED_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return set(str(uid) for uid in data)
+    except Exception:
+        return set()
+
+
+def unlock_freelance_user(user_id: int | str) -> None:
+    """Membuka akses info freelance untuk user_id tertentu."""
+    users = load_unlocked_freelance_users()
+    users.add(str(user_id))
+    try:
+        os.makedirs(os.path.dirname(FREELANCE_UNLOCKED_FILE), exist_ok=True)
+        with open(FREELANCE_UNLOCKED_FILE, "w", encoding="utf-8") as f:
+            json.dump(list(users), f, indent=2)
+    except Exception:
+        pass
+
+
+def clear_unlocked_freelance_users() -> None:
+    """Menghapus data user unlocked freelance (untuk keperluan testing)."""
+    if os.path.exists(FREELANCE_UNLOCKED_FILE):
+        try:
+            os.remove(FREELANCE_UNLOCKED_FILE)
+        except Exception:
+            pass
+
+
+def is_freelance_unlocked(user_id: int | str, owner_id: str = "") -> bool:
+    """Memeriksa apakah user sudah membuka akses info freelance."""
+    uid = str(user_id)
+    if owner_id and uid == str(owner_id):
+        return True
+    return uid in load_unlocked_freelance_users()
+
+
+def get_active_freelance_jobs() -> List[dict]:
+    """Mengambil daftar job freelance yang statusnya 'aktif'."""
+    data = load_freelance_data()
+    return [j for j in data.get("daftar_job", []) if j.get("status") == "aktif"]
 
 
 def load_verified_users() -> set:
@@ -229,20 +299,249 @@ def build_main_dashboard(chat_id: int | str, user_info: dict) -> Tuple[str, Inli
             InlineKeyboardButton("🛠️ Layanan Jasa", callback_data="view_jasa")
         ],
         [
-            InlineKeyboardButton("📢 Elva Group (Info Stok)", callback_data="view_group"),
-            InlineKeyboardButton("📦 Pesanan Saya", callback_data="my_orders")
+            InlineKeyboardButton("💼 Info Freelance (Rp5k)", callback_data="freelance_preview"),
+            InlineKeyboardButton("📢 Elva Group (Info Stok)", callback_data="view_group")
         ],
         [
-            InlineKeyboardButton("💳 Info Pembayaran", callback_data="payment_info"),
-            InlineKeyboardButton("👤 Profil Akun", callback_data="my_profile")
+            InlineKeyboardButton("📦 Pesanan Saya", callback_data="my_orders"),
+            InlineKeyboardButton("💳 Info Pembayaran", callback_data="payment_info")
         ],
         [
-            InlineKeyboardButton("❗ Bantuan & Garansi", callback_data="help_info"),
+            InlineKeyboardButton("👤 Profil Akun", callback_data="my_profile"),
+            InlineKeyboardButton("❗ Bantuan & Garansi", callback_data="help_info")
+        ],
+        [
             InlineKeyboardButton("👨‍💼 Hubungi CS / Admin", callback_data="contact_admin")
         ]
     ]
 
     return text, InlineKeyboardMarkup(keyboard)
+
+
+def build_freelance_preview_keyboard(user_id: int | str, owner_id: str = "") -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Membuat tampilan preview Info Freelance dengan proteksi 'Biar Tidak Tergocek'.
+    """
+    if is_freelance_unlocked(user_id, owner_id):
+        return build_freelance_unlocked_keyboard()
+
+    active_jobs = get_active_freelance_jobs()
+    fl_data = load_freelance_data()
+    fee_str = fl_data.get("biaya_format", "Rp5.000")
+
+    # KASUS 1: JOB KOSONG (BIAR TIDAK TERGOCEK)
+    if not active_jobs:
+        text = (
+            "💼 *INFORMASI LOWONGAN FREELANCE*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "📊 *Status Ketersediaan:* 🔴 *SEDANG KOSONG (0 Job)*\n\n"
+            "⚠️ *Jaminan Anti-Tergocek:*\n"
+            "Saat ini belum ada info job freelance baru yang aktif. "
+            "Tombol pembayaran sengaja kami *NONAKTIFKAN* agar saldo kakak aman dan tidak rugi!\n\n"
+            "🔔 _Silakan pantau terus Elva Group. Kami akan segera umumkan begitu ada proyek freelance baru yang siap dikerjakan._"
+        )
+        grp = get_group_info()
+        keyboard = [
+            [
+                InlineKeyboardButton("📢 Pantau di Elva Group", url=grp["url"])
+            ],
+            [
+                InlineKeyboardButton("🔄 Refresh Status", callback_data="freelance_preview"),
+                InlineKeyboardButton("◀️ Kembali ke Menu", callback_data="menu_main")
+            ]
+        ]
+        return text, InlineKeyboardMarkup(keyboard)
+
+    # KASUS 2: ADA JOB AKTIF (TAMPILKAN TEASER & TOMBOL BAYAR RP5.000)
+    lines = [
+        "💼 *INFORMASI LOWONGAN FREELANCE*",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        f"📊 *Status Ketersediaan:* 🟢 *TERSEDIA {len(active_jobs)} JOB AKTIF!*",
+        "Update Terkini: Hari Ini ✅\n",
+        "📋 *Preview Proyek yang Sedang Buka:*"
+    ]
+
+    for idx, j in enumerate(active_jobs, 1):
+        judul = j.get("judul", "Job Freelance")
+        kat = j.get("kategori", "-")
+        budget = j.get("budget", "-")
+        deadline = j.get("deadline", "-")
+        teaser = j.get("teaser", "-")
+        lines.append(f"*{idx}. {judul}*")
+        lines.append(f"   • Kategori: _{kat}_")
+        lines.append(f"   • Fee Proyek: *{budget}*")
+        lines.append(f"   • Estimasi Waktu: {deadline}")
+        lines.append(f"   • Ringkasan: _{teaser}_\n")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("🔒 *Detail Rahasia Terkunci:*")
+    lines.append("• Nomor WhatsApp & Akun Telegram Klien Langsung")
+    lines.append("• Link Dokumen Brief & Aset Proyek")
+    lines.append("• Rekomendasi Format Penawaran Cepat Diterima\n")
+    lines.append(f"💰 *Biaya Akses Penuh:* Hanya *{fee_str}* (Sekali Bayar)")
+    lines.append("_Dapatkan kontak langsung klien sekarang sebelum slot diambil freelancer lain!_")
+
+    keyboard = [
+        [
+            InlineKeyboardButton(f"📱 Bayar {fee_str} via QRIS (Buka Info)", callback_data="fl_pay:qris")
+        ],
+        [
+            InlineKeyboardButton("🏦 Transfer Bank BCA", callback_data="fl_pay:bca"),
+            InlineKeyboardButton("💳 DANA / OVO / GoPay", callback_data="fl_pay:ewallet")
+        ],
+        [
+            InlineKeyboardButton("◀️ Kembali ke Menu Utama", callback_data="menu_main")
+        ]
+    ]
+
+    return "\n".join(lines), InlineKeyboardMarkup(keyboard)
+
+
+def build_freelance_unlocked_keyboard() -> Tuple[str, InlineKeyboardMarkup]:
+    """
+    Membuat tampilan info freelance LENGKAP setelah pengguna membayar Rp5.000.
+    """
+    active_jobs = get_active_freelance_jobs()
+    if not active_jobs:
+        text = (
+            "🎉 *AKSES FREELANCE ANDA AKTIF (VIP)*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Saat ini semua slot proyek sebelumnya telah diambil / selesai. "
+            "Status Anda tetap VIP dan akan otomatis melihat kontak proyek berikutnya tanpa perlu bayar lagi!\n\n"
+            "🔔 _Pantau terus update di sini atau Elva Group ya kak!_"
+        )
+        keyboard = [
+            [InlineKeyboardButton("🔄 Refresh", callback_data="freelance_preview")],
+            [InlineKeyboardButton("◀️ Menu Utama", callback_data="menu_main")]
+        ]
+        return text, InlineKeyboardMarkup(keyboard)
+
+    lines = [
+        "🔓 *AKSES LENGKAP INFO FREELANCER (VIP)*",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "Selamat! Akses Anda telah aktif. Berikut kontak langsung klien & brief proyek:\n"
+    ]
+
+    for idx, j in enumerate(active_jobs, 1):
+        judul = j.get("judul", "Job Freelance")
+        kat = j.get("kategori", "-")
+        budget = j.get("budget", "-")
+        deadline = j.get("deadline", "-")
+        detail = j.get("detail_rahasia", "-")
+        lines.append(f"📌 *{idx}. {judul.upper()}*")
+        lines.append(f"• Kategori: *{kat}*")
+        lines.append(f"• Budget Fee: *{budget}*")
+        lines.append(f"• Waktu Pengerjaan: {deadline}\n")
+        lines.append(f"📝 *Detail Brief & Kontak Klien:*\n{detail}\n")
+        lines.append("──────────────────────\n")
+
+    lines.append("💡 *Tips Melamar:*")
+    lines.append("Hubungi klien dengan sopan, perkenalkan nama dan kirimkan portofolio terbaik Anda agar peluang closing lebih tinggi! Semoga sukses ya kak! 🚀")
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🔄 Refresh Info", callback_data="freelance_preview")
+        ],
+        [
+            InlineKeyboardButton("💬 Butuh Bantuan? Hubungi Admin", url="https://t.me/Carlendra")
+        ],
+        [
+            InlineKeyboardButton("◀️ Kembali ke Menu Utama", callback_data="menu_main")
+        ]
+    ]
+
+    return "\n".join(lines), InlineKeyboardMarkup(keyboard)
+
+
+def build_freelance_payment_instruction(method_code: str, chat_id: int | str, user_info: dict) -> Tuple[str, InlineKeyboardMarkup, str]:
+    """
+    Membuat instruksi pembayaran Rp5.000 untuk membuka Info Freelance.
+    """
+    menu_data = load_menu()
+    info_pay = menu_data.get("info_pembayaran", {})
+    order_id = f"ORD-FL-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    total_str = "Rp5.000"
+
+    if method_code == "qris":
+        nama_metode = "QRIS Dinamis"
+        detail_rekening = (
+            "📱 *Metode:* QRIS (Semua E-Wallet & Bank)\n"
+            "Silakan transfer tepat *Rp5.000* ke QRIS toko kami atau gunakan E-Wallet di bawah."
+        )
+    elif method_code == "bca":
+        nama_metode = "Bank BCA"
+        detail_rekening = (
+            "🏦 *Bank:* BCA\n"
+            f"• *Rekening:* `{info_pay.get('bank', '1234567890 a/n Elva Tech')}`"
+        )
+    else:
+        nama_metode = "E-Wallet (DANA/OVO/GoPay)"
+        detail_rekening = (
+            "💳 *E-Wallet:* DANA / OVO / GoPay\n"
+            f"• *Nomor:* `{info_pay.get('ewallet', '081234567890 a/n Elva Tech')}`"
+        )
+
+    text = (
+        f"✅ *PEMESANAN AKSES INFO FREELANCE*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🆔 *No. Pesanan:* `{order_id}`\n"
+        f"💼 *Layanan:* Akses Kontak & Brief Lowongan Freelance\n"
+        f"💰 *TOTAL TRANSFER:* *{total_str}* (Tepat)\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 *Tujuan Pembayaran:*\n"
+        f"{detail_rekening}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📸 *LANGKAH CEPAT AKTIVASI:*\n"
+        f"1. Transfer *{total_str}* ke tujuan di atas.\n"
+        f"2. Kirimkan *FOTO BUKTI TRANSFER* ke chat bot ini.\n"
+        f"3. Admin akan langsung memverifikasi atau ketik `/freelance` setelah disetujui.\n\n"
+        f"Terima kasih! Semoga berkah dan proyeknya tembus ya kak! 😊"
+    )
+
+    # Catat order ke CSV
+    order_data = {
+        "nama": user_info.get("full_name") or f"User {chat_id}",
+        "metode": nama_metode,
+        "alamat": "Akses Digital (Info Freelance)",
+        "waktu": "Instan",
+        "catatan": "Akses Info Freelancer Rp5.000",
+        "items": [{
+            "nama": "Akses Info Freelancer",
+            "qty": 1,
+            "harga_satuan": 5000,
+            "subtotal": 5000,
+            "catatan": "-"
+        }],
+        "total_harga": 5000
+    }
+    save_order_to_csv(order_data, chat_id, order_id, user_info)
+
+    # Format rekap untuk owner
+    username = f"@{user_info.get('username')}" if user_info.get('username') else "-"
+    cust_name = user_info.get('full_name') or f"User {chat_id}"
+    owner_msg = (
+        "💼 *PESANAN AKSES INFO FREELANCE BARU (Rp5.000)!*\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🆔 No. Pesanan: `{order_id}`\n"
+        f"👤 Pelanggan: *{cust_name}* ({username})\n"
+        f"🆔 Chat ID: `{chat_id}`\n"
+        f"💰 Total: *{total_str}* ({nama_metode})\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 *Perintah Instan Pemilik:*\n"
+        f"Ketik `/unlock {chat_id}` untuk langsung membuka akses pelanggan ini setelah mengecek mutasi pembayaran."
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton("📸 Cara Kirim Bukti", callback_data="send_proof_hint"),
+            InlineKeyboardButton("💬 Hubungi Admin", url="https://t.me/Carlendra")
+        ],
+        [
+            InlineKeyboardButton("◀️ Kembali ke Menu Utama", callback_data="menu_main")
+        ]
+    ]
+
+    return text, InlineKeyboardMarkup(keyboard), owner_msg
 
 
 def build_jasa_keyboard() -> Tuple[str, InlineKeyboardMarkup]:
