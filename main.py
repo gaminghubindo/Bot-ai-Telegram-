@@ -18,7 +18,7 @@ if sys.platform == "win32":
         pass
 
 from dotenv import load_dotenv
-from telegram import Update, constants, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import BotCommand, MenuButtonCommands, Update, constants, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -424,6 +424,21 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await send_safe_message(context, chat_id, reply_text)
 
 
+async def post_init(application: Application) -> None:
+    """Mendaftarkan tombol menu native [ ☰ Menu ] di samping kiri kolom chat Telegram."""
+    commands = [
+        BotCommand("menu", "💎 Buka Menu & Katalog Produk"),
+        BotCommand("start", "🚀 Mulai / Dashboard Akun"),
+        BotCommand("id", "🆔 Cek Chat ID Akun Saya"),
+    ]
+    try:
+        await application.bot.set_my_commands(commands)
+        await application.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+        logger.info("Tombol menu [ ☰ Menu ] Telegram berhasil dipasang!")
+    except Exception as e:
+        logger.warning(f"Gagal memasang tombol menu: {e}")
+
+
 def main() -> None:
     """Fungsi utama menjalankan Telegram Bot."""
     if not TELEGRAM_BOT_TOKEN or TELEGRAM_BOT_TOKEN == "your_telegram_bot_token_here":
@@ -436,7 +451,7 @@ def main() -> None:
     print("Tekan Ctrl+C untuk menghentikan bot.")
     print("=" * 60)
 
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
 
     # Command handlers
     application.add_handler(CommandHandler("start", start_command))
