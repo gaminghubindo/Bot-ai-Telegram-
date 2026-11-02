@@ -439,7 +439,7 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
             sample_order, "5803366133", "ORD-20261031170109"
         )
         self.assertIn("NEW PURCHASE", card_text)
-        self.assertIn("580*****33", card_text)
+        self.assertIn("580****133", card_text)
         self.assertIn("Google Pro 3 Bulan", card_text)
         self.assertIn("Total Pembelian", card_text)
 

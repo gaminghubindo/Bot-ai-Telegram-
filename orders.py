@@ -1133,11 +1133,13 @@ def clear_pending_order(chat_id: int | str) -> None:
 # ==========================================
 
 def mask_customer_id(customer_id: int | str) -> str:
-    """Menyamarkan ID pengguna demi privasi, format persis seperti di grup: 651*****99."""
+    """Menyamarkan ID pengguna demi privasi (sensor sedikit di tengah: 580****133)."""
     s = str(customer_id).strip()
     if len(s) <= 4:
         return s[:1] + "***" + s[-1:]
-    return s[:3] + "*****" + s[-2:]
+    elif len(s) <= 7:
+        return s[:2] + "****" + s[-2:]
+    return s[:3] + "****" + s[-3:]
 
 
 def mask_order_id(order_id: str) -> str:
@@ -1230,15 +1232,20 @@ def build_group_purchase_notification(
 
     total_purchases = get_customer_purchase_count(str(chat_id))
 
+    metode = order.get("metode") or "QRIS GoPay Merchant"
+    waktu_str = order.get("waktu") or order.get("timestamp") or datetime.now().strftime("%d/%m/%Y %H:%M WIB")
+
     lines = [
         "*Elva Group*\n",
         "🎉 *NEW PURCHASE* 🎉",
         "━━━━━━━━━━━━━━━━━━━━━━",
-        f"Pelanggan       `{masked_id}`",
-        f"Produk          *{prod_name}*",
-        f"Order           `{masked_oid}`",
-        f"Jumlah          {qty}",
-        f"Total Pembelian {total_purchases}",
+        f"🆔 ID Pelanggan: `{masked_id}`",
+        f"📦 Produk: *{prod_name}*",
+        f"🔢 Jumlah: {qty} Item",
+        f"💳 Metode: {metode}",
+        f"📅 Waktu: {waktu_str}",
+        f"🧾 Order: `{masked_oid}`",
+        f"📊 Total Pembelian: {total_purchases}",
         "━━━━━━━━━━━━━━━━━━━━━━"
     ]
 
