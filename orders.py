@@ -1038,6 +1038,65 @@ def save_order_to_csv(order: dict, chat_id: int | str, order_id: str, user_info:
         })
 
 
+def get_last_order(customer_id: int | str) -> Optional[dict]:
+    """Mendapatkan pesanan terakhir seorang pelanggan dari orders.csv."""
+    if not os.path.exists(ORDERS_CSV):
+        return None
+    cid = str(customer_id).strip()
+    last_row = None
+    try:
+        with open(ORDERS_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("customer_id", "").strip() == cid:
+                    last_row = row
+    except Exception:
+        return None
+    return last_row
+
+
+def get_order_by_id(order_id: str) -> Optional[dict]:
+    """Mencari pesanan berdasarkan order_id dari orders.csv."""
+    if not os.path.exists(ORDERS_CSV):
+        return None
+    oid = str(order_id).strip()
+    try:
+        with open(ORDERS_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("order_id", "").strip() == oid:
+                    return row
+    except Exception:
+        return None
+    return None
+
+
+def update_order_status(order_id: str, new_status: str) -> bool:
+    """Memperbarui status pesanan di orders.csv (misal: Selesai (Dikonfirmasi))."""
+    if not os.path.exists(ORDERS_CSV):
+        return False
+    rows = []
+    updated = False
+    fieldnames = []
+    try:
+        with open(ORDERS_CSV, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                if row.get("order_id", "").strip() == order_id.strip():
+                    row["status"] = new_status
+                    updated = True
+                rows.append(row)
+        if updated and fieldnames:
+            with open(ORDERS_CSV, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+    except Exception:
+        return False
+    return updated
+
+
 def get_menu_display_text() -> str:
     """Fallback teks daftar produk jika dipanggil sebagai teks biasa."""
     menu_data = load_menu()

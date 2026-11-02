@@ -470,5 +470,69 @@ class TestBotHandlers(unittest.IsolatedAsyncioTestCase):
         t_kwargs = context.bot.send_message.call_args.kwargs
         self.assertIn("LEADERBOARD PEMBELIAN TERBANYAK", t_kwargs["text"])
 
+
+    async def test_owner_approval_and_rejection_flow(self):
+        """Memverifikasi sistem konfirmasi 1-klik owner (admin_approve dan admin_reject)."""
+        owner_id = "5803366133"
+        cust_id = "998877"
+        order_id = "ORD-TEST-12345"
+
+        # Simpan order dummy ke CSV
+        orders.save_order_to_csv(
+            {"items": [{"nama": "Gemini Pro 1 Bulan", "qty": 1, "harga": 15000}], "total_harga": 15000, "metode": "QRIS"},
+            cust_id,
+            order_id,
+            {"full_name": "Test Customer", "username": "testcust"}
+        )
+
+        context = MagicMock()
+        context.bot.send_message = AsyncMock()
+
+        # 1. Test approve oleh owner
+        update_approve = MagicMock()
+        update_approve.effective_chat.id = int(owner_id)
+        update_approve.callback_query.data = f"admin_approve:{order_id}:{cust_id}"
+        update_approve.callback_query.answer = AsyncMock()
+        update_approve.callback_query.edit_message_caption = AsyncMock()
+
+        with patch.object(main, "OWNER_CHAT_ID", owner_id):
+            await main.handle_callback_query(update_approve, context)
+
+        # Memastikan status di-update dan pesan konfirmasi terkirim ke pelanggan
+        updated_ord = orders.get_order_by_id(order_id)
+        self.assertIsNotNone(updated_ord)
+        self.assertIn("Dikonfirmasi", updated_ord["status"])
+
+        context.bot.send_message.assert_called()
+        sent_args = [call.kwargs for call in context.bot.send_message.call_args_list]
+        self.assertTrue(any(arg.get("chat_id") == cust_id and "DIVERIFIKASI" in arg.get("text", "") for arg in sent_args))
+
+        # 2. Test reject oleh owner
+        order_id_2 = "ORD-TEST-67890"
+        orders.save_order_to_csv(
+            {"items": [{"nama": "Netflix 1 Bulan", "qty": 1, "harga": 28000}], "total_harga": 28000, "metode": "QRIS"},
+            cust_id,
+            order_id_2,
+            {"full_name": "Test Customer", "username": "testcust"}
+        )
+
+        update_reject = MagicMock()
+        update_reject.effective_chat.id = int(owner_id)
+        update_reject.callback_query.data = f"admin_reject:{order_id_2}:{cust_id}"
+        update_reject.callback_query.answer = AsyncMock()
+        update_reject.callback_query.edit_message_caption = AsyncMock()
+
+        context.bot.send_message.reset_mock()
+        with patch.object(main, "OWNER_CHAT_ID", owner_id):
+            await main.handle_callback_query(update_reject, context)
+
+        rejected_ord = orders.get_order_by_id(order_id_2)
+        self.assertIsNotNone(rejected_ord)
+        self.assertIn("Ditolak", rejected_ord["status"])
+
+        context.bot.send_message.assert_called()
+        reject_sent = [call.kwargs for call in context.bot.send_message.call_args_list]
+        self.assertTrue(any(arg.get("chat_id") == cust_id and "BELUM TERDETEKSI" in arg.get("text", "") for arg in reject_sent))
+
 if __name__ == "__main__":
     unittest.main()

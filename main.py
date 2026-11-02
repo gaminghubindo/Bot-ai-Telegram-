@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import sys
+from datetime import datetime
 
 # Dukungan UTF-8 di Windows Console
 if sys.platform == "win32":
@@ -974,6 +975,129 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await edit_safe_message(query, text, markup)
         return
 
+
+    # 13. Owner Konfirmasi Pembayaran (Uang Masuk)
+    if data.startswith("admin_approve:"):
+        parts = data.split(":")
+        order_id = parts[1]
+        customer_chat_id = parts[2]
+
+        if not OWNER_CHAT_ID or str(chat_id) != str(OWNER_CHAT_ID):
+            await query.answer("⛔ Hanya pemilik toko yang dapat mengonfirmasi pesanan!", show_alert=True)
+            return
+
+        await query.answer("✅ Mengonfirmasi pembayaran & mengirimkan notifikasi ke pelanggan... ✨")
+        orders.update_order_status(order_id, "Selesai (Dikonfirmasi)")
+        now_str = datetime.now().strftime("%d/%m/%Y %H:%M WIB")
+
+        # Cek apakah ini tiket freelance atau produk digital
+        if order_id.startswith("ORD-FL-"):
+            orders.unlock_freelance_user(customer_chat_id)
+            fl_text, fl_markup = orders.build_freelance_unlocked_keyboard()
+            cust_msg = (
+                "🎉 *PEMBAYARAN DIVERIFIKASI ADMIN!* 🎉\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Selamat kak! Pembayaran tiket freelance sebesar *Rp5.000* telah dikonfirmasi oleh admin Elva Tech.\n\n"
+                "Akses lowongan dan kontak klien freelance Anda telah *AKTIF*! Silakan gunakan brief dan tips di bawah:\n\n"
+                + fl_text
+            )
+            await send_safe_message(context, customer_chat_id, cust_msg, reply_markup=fl_markup)
+            fl_order_data = {
+                "items": [{"nama": "Akses Info Freelancer", "qty": 1, "harga": 5000}],
+                "total_harga": 5000
+            }
+            await broadcast_group_purchase(context, fl_order_data, customer_chat_id, order_id)
+        else:
+            order_obj = orders.get_order_by_id(order_id)
+            items_text = order_obj.get("items", "Produk Digital") if order_obj else "Produk Digital"
+            try:
+                tot_num = int(float(order_obj.get("total_price", 0)))
+                tot_text = f"Rp{tot_num:,}".replace(",", ".")
+            except Exception:
+                tot_text = "-"
+
+            cust_msg = (
+                "🎉 *PEMBAYARAN TELAH DIVERIFIKASI ADMIN!* 🎉\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🆔 *No. Pesanan:* `{order_id}`\n"
+                f"📦 *Item:* *{items_text}*\n"
+                f"💰 *Total:* *{tot_text}*\n"
+                "⚡ *Status:* *LUNAS & TERVERIFIKASI* ✅\n\n"
+                "Admin @Carlendra sedang menyiapkan data akun / lisensi pesanan kakak dan akan segera mengirimkannya langsung di chat ini! 😊\n\n"
+                "Jika ada pertanyaan atau butuh bantuan cepat, silakan klik tombol di bawah untuk chat langsung dengan admin:"
+            )
+            cust_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💬 Chat Admin @Carlendra", url="https://t.me/Carlendra")],
+                [InlineKeyboardButton("📢 Gabung Elva Group", url="https://t.me/+4_By8JH_MPg2Mjc9")]
+            ])
+            await send_safe_message(context, customer_chat_id, cust_msg, reply_markup=cust_markup)
+
+            if order_obj:
+                try:
+                    tot_price = int(float(order_obj.get("total_price", 0)))
+                except Exception:
+                    tot_price = 0
+                prod_order_data = {
+                    "items": [{"nama": items_text, "qty": 1, "harga": tot_price}],
+                    "total_harga": tot_price
+                }
+                await broadcast_group_purchase(context, prod_order_data, customer_chat_id, order_id)
+
+        # Ubah caption pesan bukti transfer di chat Owner agar jelas sudah selesai
+        done_caption = (
+            f"✅ *PESANAN SELESAI & SUDAH DIKONFIRMASI!*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆔 No. Pesanan: `{order_id}`\n"
+            f"👤 Pelanggan Chat ID: `{customer_chat_id}`\n"
+            f"⏰ Waktu Konfirmasi: {now_str}\n\n"
+            f"✨ Notifikasi pesanan telah otomatis dikirimkan ke pelanggan dan dicatat di database toko."
+        )
+        try:
+            await query.edit_message_caption(caption=done_caption, parse_mode=constants.ParseMode.MARKDOWN)
+        except Exception:
+            pass
+        return
+
+    # 14. Owner Menolak Pembayaran (Uang Belum Masuk)
+    if data.startswith("admin_reject:"):
+        parts = data.split(":")
+        order_id = parts[1]
+        customer_chat_id = parts[2]
+
+        if not OWNER_CHAT_ID or str(chat_id) != str(OWNER_CHAT_ID):
+            await query.answer("⛔ Hanya pemilik toko yang dapat menolak pesanan!", show_alert=True)
+            return
+
+        await query.answer("❌ Pembayaran ditandai belum masuk.")
+        orders.update_order_status(order_id, "Ditolak / Belum Masuk")
+
+        reject_msg = (
+            "⚠️ *PEMBAYARAN BELUM TERDETEKSI*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Halo kak, admin kami belum menemukan dana masuk di mutasi QRIS/rekening untuk pesanan `{order_id}`.\n\n"
+            "💡 *Petunjuk:*\n"
+            "• Pastikan kakak mentransfer ke QRIS GoPay Merchant resmi Elva Tech (NMID: `ID1026629102009`).\n"
+            "• Jika saldo kakak sudah terpotong, silakan langsung hubungi admin kami di Telegram @Carlendra dengan melampirkan screenshot mutasi bank/e-wallet kakak ya!"
+        )
+        reject_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💬 Hubungi Admin @Carlendra", url="https://t.me/Carlendra")],
+            [InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_main")]
+        ])
+        await send_safe_message(context, customer_chat_id, reject_msg, reply_markup=reject_markup)
+
+        done_caption = (
+            f"❌ *BUKTI PEMBAYARAN DITOLAK*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆔 No. Pesanan: `{order_id}`\n"
+            f"👤 Pelanggan: `{customer_chat_id}`\n\n"
+            f"Pelanggan telah diberi tahu bahwa dana belum masuk ke mutasi."
+        )
+        try:
+            await query.edit_message_caption(caption=done_caption, parse_mode=constants.ParseMode.MARKDOWN)
+        except Exception:
+            pass
+        return
+
     # Default fallback answer
     await query.answer()
 
@@ -1110,22 +1234,47 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await send_safe_message(context, chat_id, "✅ *QR Code GoPay Berhasil Disimpan!* 🎉\n\nFoto QR Code GoPay ini sekarang otomatis akan ditampilkan saat pelanggan membayar Info Freelance dan produk via QRIS!")
             return
 
-    # Teruskan foto bukti pembayaran ke pemilik toko
+    # Teruskan foto bukti pembayaran ke pemilik toko lengkap dengan tombol 1-Klik Konfirmasi
     if OWNER_CHAT_ID and OWNER_CHAT_ID != "your_chat_id_here":
         try:
+            last_order = orders.get_last_order(chat_id)
+            order_id = last_order.get("order_id") if last_order else f"ORD-{chat_id}"
+            items_str = last_order.get("items") if last_order else "Produk Digital"
+            try:
+                tot_val = int(float(last_order.get("total_price", 0)))
+                total_str = f"Rp{tot_val:,}".replace(",", ".")
+            except Exception:
+                total_str = "-"
+            method_str = last_order.get("method") if last_order else "QRIS GoPay"
+
             caption = (
                 "📸 *BUKTI PEMBAYARAN BARU DITERIMA!*\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🆔 No. Pesanan: `{order_id}`\n"
                 f"👤 Dari: *{user_info['full_name']}* ({user_info['username']})\n"
-                f"🆔 Chat ID: `{chat_id}`\n\n"
-                "⚠️ _Mohon segera cek mutasi rekening/QRIS dan kirimkan akun ke pelanggan ini._"
+                f"🆔 Chat ID: `{chat_id}`\n"
+                f"📦 Item: *{items_str}*\n"
+                f"💰 Total: *{total_str}*\n"
+                f"📱 Metode: *{method_str}*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "⚠️ _Silakan cek aplikasi GoPay Merchant / mutasi rekening Anda terlebih dahulu._\n"
+                "_Jika uang SUDAH masuk, klik tombol Konfirmasi di bawah:_"
             )
+            admin_markup = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Konfirmasi Uang Masuk & Kirim Produk", callback_data=f"admin_approve:{order_id}:{chat_id}")
+                ],
+                [
+                    InlineKeyboardButton("❌ Tolak (Dana Belum Masuk)", callback_data=f"admin_reject:{order_id}:{chat_id}")
+                ]
+            ])
             photo_file_id = update.message.photo[-1].file_id
             await context.bot.send_photo(
                 chat_id=OWNER_CHAT_ID,
                 photo=photo_file_id,
                 caption=caption,
-                parse_mode=constants.ParseMode.MARKDOWN
+                parse_mode=constants.ParseMode.MARKDOWN,
+                reply_markup=admin_markup
             )
         except Exception as e:
             logger.error(f"Gagal meneruskan bukti transfer ke pemilik: {e}")
