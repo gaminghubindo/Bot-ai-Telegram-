@@ -334,9 +334,30 @@ async def setgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await send_safe_message(
             context,
             chat_id,
-            f"✅ *Elva Group Berhasil Disetel!* 🎉\n\nID Grup `{chat_id}` berhasil disimpan. "
-            "Mulai sekarang, histori pembelian produk (*NEW PURCHASE*) akan otomatis muncul di grup ini! 🛍️"
+            f"✅ *Elva Group Berhasil Terhubung!* 🎉\n\n"
+            f"ID Grup `{chat_id}` berhasil disimpan ke sistem.\n"
+            "Mulai detik ini, setiap ada pembelian produk (*NEW PURCHASE*) akan otomatis disiarkan langsung di grup ini! 🛍️"
         )
+        # Langsung kirimkan contoh kartu NEW PURCHASE ke grup agar owner dan anggota bisa melihat hasilnya
+        sample_order = {
+            "items": [{"nama": "Gemini Pro 1 Bulan", "qty": 1, "harga": 15000}],
+            "total_harga": 15000,
+            "metode": "QRIS GoPay Merchant",
+            "waktu": datetime.now().strftime("%d/%m/%Y %H:%M WIB")
+        }
+        sample_order_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        card_text, card_markup = orders.build_group_purchase_notification(
+            sample_order, chat_id, sample_order_id, bot_username="Profesional_umkm_bot"
+        )
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=card_text,
+                parse_mode=constants.ParseMode.MARKDOWN,
+                reply_markup=card_markup
+            )
+        except Exception as e:
+            logger.warning(f"Gagal mengirim kartu contoh saat setgroup: {e}")
         return
 
     # Jika dijalankan di chat pribadi oleh owner
